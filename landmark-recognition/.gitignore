@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Tool and notebook artifacts
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Local configuration and secrets
+.env
+.env.*
+
+# Machine-learning outputs
+checkpoints/*
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Large datasets and generated data
+data/raw/*
+data/processed/*
+data/splits/*
+*.zip
+*.tar
+*.tar.gz
+*.gz
+
+# Keep directory placeholders
+!checkpoints/.gitkeep
+!data/raw/README.md
+!data/processed/.gitkeep
+!data/splits/.gitkeep

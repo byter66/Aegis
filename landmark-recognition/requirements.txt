@@ -1,0 +1,6 @@
+torch
+torchvision
+pillow
+pandas
+scikit-learn
+matplotlib

@@ -1,0 +1,9 @@
+{
+  "model": "experiment1_frozen_baseline",
+  "checkpoint": "C:\\Users\\lenovo\\OneDrive\\Documents\\Aegis\\landmark-recognition\\models\\checkpoints\\efficientnet_b0_best.pth",
+  "test_loss": 2.377006816192412,
+  "top1_accuracy": 0.4295774647887324,
+  "top5_accuracy": 0.7183098591549296,
+  "test_images": 142,
+  "num_classes": 50
+}
