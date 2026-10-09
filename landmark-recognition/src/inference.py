@@ -88,12 +88,19 @@ def predict_landmark(
         Mapping between class indices and landmark IDs.
     confidence_threshold : float
         Minimum confidence required to mark a landmark as detected.
+        Must be between 0.0 and 1.0, inclusive.
 
     Returns
     -------
     dict
         Structured result for the Aegis risk-fusion module.
     """
+
+    # Validate the confidence threshold.
+    if not 0.0 <= confidence_threshold <= 1.0:
+        raise ValueError(
+            "confidence_threshold must be between 0.0 and 1.0."
+        )
 
     image_path = Path(image_path)
 
@@ -161,7 +168,7 @@ if __name__ == "__main__":
         "--threshold",
         type=float,
         default=0.50,
-        help="Confidence threshold for landmark detection.",
+        help="Confidence threshold for landmark detection (0.0 to 1.0).",
     )
 
     args = parser.parse_args()

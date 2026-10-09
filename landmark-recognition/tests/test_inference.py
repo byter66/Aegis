@@ -57,6 +57,22 @@ class TestLandmarkInference(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             predict_landmark(missing_image)
 
+    def test_threshold_below_zero_raises_error(self):
+        """A negative confidence threshold should raise ValueError."""
+        with self.assertRaisesRegex(ValueError, "confidence_threshold"):
+            predict_landmark(
+                SAMPLE_IMAGE,
+                confidence_threshold=-0.1,
+            )
+
+    def test_threshold_above_one_raises_error(self):
+        """A confidence threshold above one should raise ValueError."""
+        with self.assertRaisesRegex(ValueError, "confidence_threshold"):
+            predict_landmark(
+                SAMPLE_IMAGE,
+                confidence_threshold=1.1,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
