@@ -1,0 +1,11 @@
+# Preserved local Landmark Recognition data and model artifacts
+/landmark-recognition/data/raw/
+/landmark-recognition/data/processed/
+/landmark-recognition/data/splits/
+/landmark-recognition/checkpoints/
+/landmark-recognition/models/checkpoints/
+/landmark-recognition/*.zip
+/landmark-recognition/*.tar
+/landmark-recognition/*.tar.gz
+/landmark-recognition/*.gz
+/landmark-recognition/**/__pycache__/
