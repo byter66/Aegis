@@ -1,1 +1,0 @@
-"""Landmark-recognition package."""
