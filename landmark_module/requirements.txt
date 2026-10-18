@@ -1,0 +1,5 @@
+tensorflow
+torch
+transformers
+pillow
+numpy
