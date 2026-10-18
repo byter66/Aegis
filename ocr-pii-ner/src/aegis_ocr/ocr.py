@@ -18,7 +18,14 @@ OCRPoint: TypeAlias = tuple[float, float]
 
 
 class _Reader(Protocol):
-    def readtext(self, image: str, *, detail: int, paragraph: bool) -> list[object]: ...
+    def readtext(
+        self,
+        image: str,
+        *,
+        detail: int,
+        paragraph: bool,
+        **kwargs: object,
+    ) -> list[object]: ...
 
 
 class _ReaderFactory(Protocol):
@@ -92,9 +99,15 @@ class EasyOCREngine:
         *,
         reader: _Reader | None = None,
         reader_factory: _ReaderFactory | None = None,
+        canvas_size: int | None = None,
     ) -> None:
+        if canvas_size is not None and (
+            isinstance(canvas_size, bool) or not isinstance(canvas_size, int) or canvas_size <= 0
+        ):
+            raise ValueError("canvas_size must be a positive integer or None")
         self._reader = reader
         self._reader_factory = reader_factory
+        self._canvas_size = canvas_size
 
     def extract(self, image_path: str | Path) -> OCRResult:
         """Extract printed English text from one readable JPEG or PNG image."""
@@ -110,7 +123,14 @@ class EasyOCREngine:
 
         try:
             reader = self._get_reader()
-            raw_results = reader.readtext(str(path), detail=1, paragraph=False)
+            inference_options = (
+                {"canvas_size": self._canvas_size}
+                if self._canvas_size is not None
+                else {}
+            )
+            raw_results = reader.readtext(
+                str(path), detail=1, paragraph=False, **inference_options
+            )
             segments = tuple(_to_segment(item) for item in raw_results)
         except Exception:
             # Exception messages may include paths or extracted text; keep them out of results.

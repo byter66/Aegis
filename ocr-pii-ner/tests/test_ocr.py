@@ -23,9 +23,13 @@ class StubReader:
         self.results = results or []
         self.error = error
         self.calls: list[tuple[str, int, bool]] = []
+        self.options: list[dict[str, object]] = []
 
-    def readtext(self, image: str, *, detail: int, paragraph: bool) -> list[object]:
+    def readtext(
+        self, image: str, *, detail: int, paragraph: bool, **kwargs: object
+    ) -> list[object]:
         self.calls.append((image, detail, paragraph))
+        self.options.append(kwargs)
         if self.error is not None:
             raise self.error
         return self.results
@@ -86,6 +90,34 @@ def test_empty_ocr_results_are_success_not_failure(tmp_path: Path) -> None:
     assert result.status is PipelineStatus.OK
     assert result.segments == ()
     assert result.errors == ()
+
+
+@pytest.mark.parametrize("canvas_size", [0, -1, True, 1.5, "1280"])
+def test_canvas_size_must_be_a_positive_integer_or_none(canvas_size: object) -> None:
+    with pytest.raises(ValueError, match="canvas_size must be a positive integer or None"):
+        EasyOCREngine(canvas_size=canvas_size)  # type: ignore[arg-type]
+
+
+def test_default_inference_sizing_preserves_existing_readtext_arguments(tmp_path: Path) -> None:
+    image = _write_png(tmp_path / "default-sizing.png")
+    reader = StubReader()
+
+    result = EasyOCREngine(reader=reader).extract(image)
+
+    assert result.status is PipelineStatus.OK
+    assert reader.calls == [(str(image), 1, False)]
+    assert reader.options == [{}]
+
+
+def test_configured_canvas_size_is_forwarded_to_readtext(tmp_path: Path) -> None:
+    image = _write_png(tmp_path / "reduced-canvas.png")
+    reader = StubReader()
+
+    result = EasyOCREngine(reader=reader, canvas_size=1280).extract(image)
+
+    assert result.status is PipelineStatus.OK
+    assert reader.calls == [(str(image), 1, False)]
+    assert reader.options == [{"canvas_size": 1280}]
 
 
 def test_multiple_segments_preserve_engine_order_scores_and_polygons(tmp_path: Path) -> None:
