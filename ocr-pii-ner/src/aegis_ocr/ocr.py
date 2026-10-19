@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import importlib
+import logging
 import math
 from numbers import Real
 from pathlib import Path
+import time
 from typing import Protocol, TypeAlias, cast
 
 import numpy as np
@@ -18,6 +20,7 @@ from .schema import ImageRegion, PipelineError, PipelineStatus
 OCRPoint: TypeAlias = tuple[float, float]
 _TileBounds: TypeAlias = tuple[int, int, int, int]
 _TILE_DUPLICATE_IOU = 0.5
+_LOGGER = logging.getLogger(__name__)
 
 
 class _Reader(Protocol):
@@ -95,6 +98,11 @@ class EasyOCREngine:
     This MVP class is not thread-safe: lazy initialization and calls to the
     underlying reader are not synchronized. Use one engine per worker or
     synchronize calls externally.
+
+    Set ``diagnostic_timing=True`` to emit privacy-safe INFO logs for image
+    validation/decoding, reader initialization or reuse, tile preprocessing,
+    inference, result conversion, and deduplication. Logs contain timing and geometry only;
+    configure the ``aegis_ocr.ocr`` logger at INFO to collect them.
     """
 
     def __init__(
@@ -105,7 +113,10 @@ class EasyOCREngine:
         canvas_size: int | None = None,
         tile_size: int | None = None,
         tile_overlap: int = 0,
+        diagnostic_timing: bool = False,
     ) -> None:
+        if not isinstance(diagnostic_timing, bool):
+            raise ValueError("diagnostic_timing must be a boolean")
         if canvas_size is not None and (
             isinstance(canvas_size, bool) or not isinstance(canvas_size, int) or canvas_size <= 0
         ):
@@ -127,6 +138,7 @@ class EasyOCREngine:
         self._canvas_size = canvas_size
         self._tile_size = tile_size
         self._tile_overlap = tile_overlap
+        self._diagnostic_timing = diagnostic_timing
 
     def extract(self, image_path: str | Path) -> OCRResult:
         """Extract printed English text from one readable JPEG or PNG image."""
@@ -136,12 +148,33 @@ class EasyOCREngine:
             return _error_result(path_error)
         assert path is not None
 
+        started = time.perf_counter() if self._diagnostic_timing else 0.0
         image_error = _validate_image(path)
+        if self._diagnostic_timing:
+            _emit_timing(
+                "image_validation",
+                started,
+                status="failure" if image_error else "success",
+            )
         if image_error is not None:
             return _error_result(image_error)
 
         try:
-            reader = self._get_reader()
+            reader_was_uninitialized = self._reader is None
+            reader_started = time.perf_counter() if self._diagnostic_timing else 0.0
+            reader: _Reader | None = None
+            try:
+                reader = self._get_reader()
+            finally:
+                if self._diagnostic_timing:
+                    _emit_timing(
+                        "reader_initialization"
+                        if reader_was_uninitialized
+                        else "reader_reuse",
+                        reader_started,
+                        status="success" if reader is not None else "failure",
+                    )
+            assert reader is not None
             inference_options = (
                 {"canvas_size": self._canvas_size}
                 if self._canvas_size is not None
@@ -175,34 +208,90 @@ class EasyOCREngine:
         tile_count = 0
         failed_tiles = 0
 
-        with Image.open(path) as image:
-            image.load()
-            image_width, image_height = image.size
-            x_starts = _tile_starts(image_width, self._tile_size, self._tile_overlap)
-            y_starts = _tile_starts(image_height, self._tile_size, self._tile_overlap)
-
-            for top in y_starts:
-                for left in x_starts:
-                    right = min(left + self._tile_size, image_width)
-                    bottom = min(top + self._tile_size, image_height)
-                    bounds = (left, top, right, bottom)
-                    tile_index = tile_count
-                    tile_count += 1
-                    try:
-                        tile_segments = _read_tile(
-                            image,
-                            reader,
-                            bounds,
-                            image_size=(image_width, image_height),
-                            inference_options=inference_options,
-                        )
-                    except Exception:
-                        # Keep exception messages and recognized text out of errors.
-                        failed_tiles += 1
-                        continue
-                    detections.extend(
-                        (segment, tile_index, bounds) for segment in tile_segments
+        decode_started = time.perf_counter() if self._diagnostic_timing else 0.0
+        decode_complete = False
+        try:
+            with Image.open(path) as image:
+                image.load()
+                decode_complete = True
+                if self._diagnostic_timing:
+                    _emit_timing("image_decode", decode_started, status="success")
+                image_width, image_height = image.size
+                plan_started = time.perf_counter() if self._diagnostic_timing else 0.0
+                x_starts = _tile_starts(image_width, self._tile_size, self._tile_overlap)
+                y_starts = _tile_starts(image_height, self._tile_size, self._tile_overlap)
+                if self._diagnostic_timing:
+                    _emit_timing(
+                        "tile_plan",
+                        plan_started,
+                        status="success",
+                        image_width=image_width,
+                        image_height=image_height,
+                        tile_size=self._tile_size,
+                        tile_overlap=self._tile_overlap,
+                        tile_count=len(x_starts) * len(y_starts),
                     )
+
+                for top in y_starts:
+                    for left in x_starts:
+                        right = min(left + self._tile_size, image_width)
+                        bottom = min(top + self._tile_size, image_height)
+                        bounds = (left, top, right, bottom)
+                        tile_index = tile_count
+                        tile_count += 1
+                        tile_started = time.perf_counter() if self._diagnostic_timing else 0.0
+                        try:
+                            tile_segments = _read_tile(
+                                image,
+                                reader,
+                                bounds,
+                                image_size=(image_width, image_height),
+                                inference_options=inference_options,
+                                diagnostic_timing=self._diagnostic_timing,
+                                tile_index=tile_index,
+                            )
+                        except Exception:
+                            # Keep exception messages and recognized text out of errors.
+                            failed_tiles += 1
+                            if self._diagnostic_timing:
+                                _emit_timing(
+                                    "tile_complete",
+                                    tile_started,
+                                    status="failure",
+                                    tile_index=tile_index,
+                                    tile_width=right - left,
+                                    tile_height=bottom - top,
+                                    segment_count=0,
+                                )
+                            continue
+                        if self._diagnostic_timing:
+                            _emit_timing(
+                                "tile_complete",
+                                tile_started,
+                                status="success",
+                                tile_index=tile_index,
+                                tile_width=right - left,
+                                tile_height=bottom - top,
+                                segment_count=len(tile_segments),
+                            )
+                        detections.extend(
+                            (segment, tile_index, bounds) for segment in tile_segments
+                        )
+        except Exception:
+            if self._diagnostic_timing and not decode_complete:
+                _emit_timing("image_decode", decode_started, status="failure")
+            raise
+
+        dedup_started = time.perf_counter() if self._diagnostic_timing else 0.0
+        deduplicated = _deduplicate_tile_segments(detections)
+        if self._diagnostic_timing:
+            _emit_timing(
+                "tile_deduplication",
+                dedup_started,
+                status="success",
+                input_segments=len(detections),
+                output_segments=len(deduplicated),
+            )
 
         if failed_tiles == tile_count:
             return _error_result(
@@ -215,7 +304,7 @@ class EasyOCREngine:
         if failed_tiles:
             return OCRResult(
                 status=PipelineStatus.PARTIAL,
-                segments=_deduplicate_tile_segments(detections),
+                segments=deduplicated,
                 errors=(
                     PipelineError(
                         code="ocr_partial",
@@ -226,7 +315,7 @@ class EasyOCREngine:
             )
         return OCRResult(
             status=PipelineStatus.OK,
-            segments=_deduplicate_tile_segments(detections),
+            segments=deduplicated,
         )
 
     def _get_reader(self) -> _Reader:
@@ -337,40 +426,96 @@ def _read_tile(
     *,
     image_size: tuple[int, int],
     inference_options: dict[str, object],
+    diagnostic_timing: bool = False,
+    tile_index: int = 0,
 ) -> tuple[OCRSegment, ...]:
     left, top, right, bottom = bounds
-    tile = image.crop(bounds)
-    if tile.mode != "RGB":
-        tile = tile.convert("RGB")
-    # EasyOCR treats three-channel ndarray input as BGR. Only the bounded tile
-    # is copied into that layout; the full source image is never converted.
-    tile_bgr = np.ascontiguousarray(np.asarray(tile)[:, :, ::-1])
-    raw_results = reader.readtext(
-        tile_bgr, detail=1, paragraph=False, **inference_options
-    )
     tile_width, tile_height = right - left, bottom - top
-    image_width, image_height = image_size
-    segments: list[OCRSegment] = []
-    for item in raw_results:
-        segment = _to_segment(item)
-        translated: list[OCRPoint] = []
-        for x, y in segment.image_region.polygon:
-            # Reject impossible local coordinates rather than clamping or
-            # fabricating a point at an image edge.
-            if not 0.0 <= x <= tile_width or not 0.0 <= y <= tile_height:
-                raise ValueError("OCR result coordinates exceed the image tile")
-            source_x, source_y = x + left, y + top
-            if source_x > image_width or source_y > image_height:
-                raise ValueError("OCR result coordinates exceed the source image")
-            translated.append((source_x, source_y))
-        segments.append(
-            OCRSegment(
-                text=segment.text,
-                image_region=ImageRegion(tuple(translated)),
-                ocr_confidence=segment.ocr_confidence,
+    preprocess_started = time.perf_counter() if diagnostic_timing else 0.0
+    preprocess_succeeded = False
+    try:
+        tile = image.crop(bounds)
+        if tile.mode != "RGB":
+            tile = tile.convert("RGB")
+        # EasyOCR treats three-channel ndarray input as BGR. Only the bounded tile
+        # is copied into that layout; the full source image is never converted.
+        tile_bgr = np.ascontiguousarray(np.asarray(tile)[:, :, ::-1])
+        preprocess_succeeded = True
+    finally:
+        if diagnostic_timing:
+            _emit_timing(
+                "tile_preprocessing",
+                preprocess_started,
+                status="success" if preprocess_succeeded else "failure",
+                tile_index=tile_index,
+                tile_width=tile_width,
+                tile_height=tile_height,
             )
+
+    inference_started = time.perf_counter() if diagnostic_timing else 0.0
+    if diagnostic_timing:
+        _emit_timing(
+            "tile_inference_started",
+            inference_started,
+            status="started",
+            tile_index=tile_index,
+            tile_width=tile_width,
+            tile_height=tile_height,
         )
-    return tuple(segments)
+    inference_succeeded = False
+    try:
+        raw_results = reader.readtext(
+            tile_bgr, detail=1, paragraph=False, **inference_options
+        )
+        inference_succeeded = True
+    finally:
+        if diagnostic_timing:
+            _emit_timing(
+                "tile_inference",
+                inference_started,
+                status="success" if inference_succeeded else "failure",
+                tile_index=tile_index,
+                tile_width=tile_width,
+                tile_height=tile_height,
+            )
+
+    processing_started = time.perf_counter() if diagnostic_timing else 0.0
+    processing_succeeded = False
+    try:
+        segments: list[OCRSegment] = []
+        image_width, image_height = image_size
+        for item in raw_results:
+            segment = _to_segment(item)
+            translated: list[OCRPoint] = []
+            for x, y in segment.image_region.polygon:
+                # Reject impossible local coordinates rather than clamping or
+                # fabricating a point at an image edge.
+                if not 0.0 <= x <= tile_width or not 0.0 <= y <= tile_height:
+                    raise ValueError("OCR result coordinates exceed the image tile")
+                source_x, source_y = x + left, y + top
+                if source_x > image_width or source_y > image_height:
+                    raise ValueError("OCR result coordinates exceed the source image")
+                translated.append((source_x, source_y))
+            segments.append(
+                OCRSegment(
+                    text=segment.text,
+                    image_region=ImageRegion(tuple(translated)),
+                    ocr_confidence=segment.ocr_confidence,
+                )
+            )
+        processing_succeeded = True
+        return tuple(segments)
+    finally:
+        if diagnostic_timing:
+            _emit_timing(
+                "tile_result_processing",
+                processing_started,
+                status="success" if processing_succeeded else "failure",
+                tile_index=tile_index,
+                tile_width=tile_width,
+                tile_height=tile_height,
+                segment_count=len(segments) if processing_succeeded else 0,
+            )
 
 
 def _deduplicate_tile_segments(
@@ -435,6 +580,24 @@ def _box_iou(first: tuple[OCRPoint, ...], second: tuple[OCRPoint, ...]) -> float
     )
     union = first_area + second_area - intersection
     return intersection / union if union > 0.0 else 0.0
+
+
+def _emit_timing(event: str, started: float, *, status: str, **fields: int) -> None:
+    """Emit only fixed event names, numeric metadata, and a fixed status token."""
+    try:
+        details = " ".join(f"{name}={value}" for name, value in fields.items())
+        suffix = f" {details}" if details else ""
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        _LOGGER.info(
+            "ocr_diagnostic event=%s status=%s elapsed_ms=%.3f%s",
+            event,
+            status,
+            elapsed_ms,
+            suffix,
+        )
+    except Exception:
+        # Diagnostics must never alter OCR results or error handling.
+        pass
 
 
 def _error_result(error: PipelineError) -> OCRResult:

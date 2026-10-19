@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import logging
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -278,6 +279,97 @@ def test_tiled_partial_failure_preserves_successful_segments_and_safe_error(
     assert [segment.text for segment in result.segments] == ["synthetic"]
     assert result.errors[0].code == "ocr_partial"
     assert "private recognized text" not in result.errors[0].message
+
+
+def test_tile_timing_is_opt_in_and_reports_only_safe_stage_metadata(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    image = _write_png(tmp_path / "diagnostic.png")
+    reader = StubReader([(_box(1, 1, 4, 4), "SENSITIVE_SYNTHETIC_SENTINEL", 0.8)])
+
+    with caplog.at_level(logging.INFO, logger="aegis_ocr.ocr"):
+        ordinary = EasyOCREngine(reader=reader, tile_size=10, tile_overlap=2).extract(image)
+    assert ordinary.status is PipelineStatus.OK
+    assert len(ordinary.segments) == 6
+    assert "ocr_diagnostic" not in caplog.text
+
+    caplog.clear()
+    reader = StubReader([(_box(1, 1, 4, 4), "SENSITIVE_SYNTHETIC_SENTINEL", 0.8)])
+    with caplog.at_level(logging.INFO, logger="aegis_ocr.ocr"):
+        diagnostic = EasyOCREngine(
+            reader=reader,
+            tile_size=10,
+            tile_overlap=2,
+            diagnostic_timing=True,
+        ).extract(image)
+
+    assert diagnostic == ordinary
+    messages = caplog.text
+    for event in (
+        "image_validation",
+        "reader_reuse",
+        "image_decode",
+        "tile_plan",
+        "tile_preprocessing",
+        "tile_inference_started",
+        "tile_inference",
+        "tile_result_processing",
+        "tile_complete",
+        "tile_deduplication",
+    ):
+        assert f"event={event}" in messages
+    assert "tile_count=6" in messages
+    assert "tile_index=0" in messages
+    assert "tile_width=10" in messages
+    assert "status=success" in messages
+    assert "SENSITIVE_SYNTHETIC_SENTINEL" not in messages
+    assert str(image) not in messages
+
+
+def test_tile_timing_failure_does_not_change_safe_partial_result(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    image = _write_png(tmp_path / "diagnostic-partial.png")
+    reader = SequencedReader(
+        [RuntimeError("SENSITIVE_SYNTHETIC_SENTINEL")] + [[] for _ in range(5)]
+    )
+
+    with caplog.at_level(logging.INFO, logger="aegis_ocr.ocr"):
+        result = EasyOCREngine(
+            reader=reader,
+            tile_size=10,
+            tile_overlap=2,
+            diagnostic_timing=True,
+        ).extract(image)
+
+    assert result.status is PipelineStatus.PARTIAL
+    assert result.segments == ()
+    assert result.errors[0].code == "ocr_partial"
+    assert "event=tile_inference status=failure" in caplog.text
+    assert "event=tile_complete status=failure" in caplog.text
+    assert "SENSITIVE_SYNTHETIC_SENTINEL" not in caplog.text
+
+
+def test_timing_distinguishes_reader_initialization_from_reuse(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    image = _write_png(tmp_path / "reader-timing.png")
+    reader = StubReader()
+    factory = Mock(return_value=reader)
+    engine = EasyOCREngine(
+        reader_factory=factory,
+        tile_size=10,
+        tile_overlap=2,
+        diagnostic_timing=True,
+    )
+
+    with caplog.at_level(logging.INFO, logger="aegis_ocr.ocr"):
+        engine.extract(image)
+        engine.extract(image)
+
+    assert caplog.text.count("event=reader_initialization ") == 1
+    assert caplog.text.count("event=reader_reuse ") == 1
+    factory.assert_called_once_with(["en"], gpu=False)
 
 
 def test_all_tiled_inference_failures_return_safe_ocr_error(tmp_path: Path) -> None:
