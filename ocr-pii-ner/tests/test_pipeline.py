@@ -8,6 +8,7 @@ import pytest
 from aegis_ocr.ner import SpacyNERAdapter
 from aegis_ocr.ocr import OCRResult, OCRSegment
 from aegis_ocr.pipeline import analyze_image
+from aegis_ocr.risk_fusion import to_risk_fusion_ocr_payload
 from aegis_ocr.schema import (
     Finding,
     FindingCategory,
@@ -25,6 +26,24 @@ def _segment(text: str, confidence: float = 0.91, x: float = 0.0) -> OCRSegment:
     return OCRSegment(
         text=text,
         image_region=ImageRegion(((x, 0.0), (x + 100.0, 0.0), (x + 100.0, 20.0), (x, 20.0))),
+        ocr_confidence=confidence,
+    )
+
+
+def _positioned_segment(
+    text: str,
+    *,
+    left: float,
+    top: float,
+    right: float,
+    bottom: float,
+    confidence: float = 0.91,
+) -> OCRSegment:
+    return OCRSegment(
+        text=text,
+        image_region=ImageRegion(
+            ((left, top), (right, top), (right, bottom), (left, bottom))
+        ),
         ocr_confidence=confidence,
     )
 
@@ -100,6 +119,201 @@ def test_combines_all_finding_types_with_segment_provenance() -> None:
         (4, 24),
         (25, len(text)),
     ]
+
+
+def test_two_adjacent_same_line_segments_detect_split_phone_with_union_region() -> None:
+    first = _positioned_segment("+1 555", left=10, top=20, right=70, bottom=40)
+    second = _positioned_segment("234 5678", left=74, top=21, right=150, bottom=41)
+
+    result = analyze_image(
+        "synthetic.png", ocr=FakeOCR(_result(first, second)), ner=FakeNER()
+    )
+
+    (phone,) = [item for item in result.findings if item.category is FindingCategory.PHONE]
+    assert phone.value is None
+    assert phone.redacted_value == "[PHONE]"
+    assert phone.source_segment_index is None
+    assert phone.ocr_confidence is None
+    assert phone.image_region == ImageRegion(
+        ((10.0, 20.0), (150.0, 20.0), (150.0, 41.0), (10.0, 41.0))
+    )
+    assert phone.span == TextSpan(0, len("+1 555 234 5678"))
+
+
+def test_three_adjacent_same_line_segments_detect_split_phone() -> None:
+    segments = _result(
+        _positioned_segment("+1", left=0, top=10, right=24, bottom=30),
+        _positioned_segment("555", left=27, top=10, right=63, bottom=30),
+        _positioned_segment("234 5678", left=66, top=10, right=145, bottom=30),
+    )
+
+    result = analyze_image("synthetic.png", ocr=FakeOCR(segments), ner=FakeNER())
+
+    phones = [item for item in result.findings if item.category is FindingCategory.PHONE]
+    assert len(phones) == 1
+    assert phones[0].source_segment_index is None
+    assert phones[0].image_region == ImageRegion(
+        ((0.0, 10.0), (145.0, 10.0), (145.0, 30.0), (0.0, 30.0))
+    )
+
+
+def test_adjacent_unrelated_text_is_not_joined_into_phone_candidate() -> None:
+    segments = _result(
+        _positioned_segment("+1 555", left=0, top=10, right=60, bottom=30),
+        _positioned_segment("extension", left=63, top=10, right=140, bottom=30),
+        _positioned_segment("234 5678", left=143, top=10, right=220, bottom=30),
+    )
+
+    result = analyze_image("synthetic.png", ocr=FakeOCR(segments), ner=FakeNER())
+
+    assert not any(item.category is FindingCategory.PHONE for item in result.findings)
+
+
+def test_segments_on_different_lines_are_not_joined_for_phone_detection() -> None:
+    segments = _result(
+        _positioned_segment("+1 555", left=0, top=0, right=60, bottom=20),
+        _positioned_segment("234 5678", left=63, top=70, right=140, bottom=90),
+    )
+
+    result = analyze_image("synthetic.png", ocr=FakeOCR(segments), ner=FakeNER())
+
+    assert not any(item.category is FindingCategory.PHONE for item in result.findings)
+
+
+def test_distant_segments_are_not_joined_for_phone_detection() -> None:
+    segments = _result(
+        _positioned_segment("+1 555", left=0, top=0, right=60, bottom=20),
+        _positioned_segment("234 5678", left=500, top=0, right=580, bottom=20),
+    )
+
+    result = analyze_image("synthetic.png", ocr=FakeOCR(segments), ner=FakeNER())
+
+    assert not any(item.category is FindingCategory.PHONE for item in result.findings)
+
+
+def test_single_segment_phone_is_not_duplicated_by_grouped_detection() -> None:
+    segments = _result(
+        _positioned_segment("+1 202-555-0100", left=0, top=0, right=160, bottom=20),
+        _positioned_segment("extension", left=165, top=0, right=240, bottom=20),
+    )
+
+    result = analyze_image("synthetic.png", ocr=FakeOCR(segments), ner=FakeNER())
+
+    phones = [item for item in result.findings if item.category is FindingCategory.PHONE]
+    assert len(phones) == 1
+    assert phones[0].source_segment_index == 0
+    assert phones[0].ocr_confidence == 0.91
+
+
+def test_overlapping_ocr_representations_of_one_phone_emit_one_finding() -> None:
+    segments = _result(
+        _positioned_segment(
+            "+1 202-555-0100", left=20, top=30, right=180, bottom=54
+        ),
+        _positioned_segment(
+            "+1 (202) 555 0100", left=23, top=31, right=183, bottom=55
+        ),
+    )
+
+    result = analyze_image("synthetic.png", ocr=FakeOCR(segments), ner=FakeNER())
+
+    phones = [item for item in result.findings if item.category is FindingCategory.PHONE]
+    assert len(phones) == 1
+    assert phones[0].category is FindingCategory.PHONE
+    assert phones[0].redacted_value == "[PHONE]"
+    assert phones[0].image_region == segments.segments[0].image_region
+
+
+def test_identical_phones_at_separate_locations_remain_separate_findings() -> None:
+    segments = _result(
+        _positioned_segment(
+            "+1 202-555-0100", left=20, top=30, right=180, bottom=54
+        ),
+        _positioned_segment(
+            "+1 202-555-0100", left=420, top=230, right=580, bottom=254
+        ),
+    )
+
+    result = analyze_image("synthetic.png", ocr=FakeOCR(segments), ner=FakeNER())
+
+    phones = [item for item in result.findings if item.category is FindingCategory.PHONE]
+    assert len(phones) == 2
+    assert [item.category for item in phones] == [
+        FindingCategory.PHONE,
+        FindingCategory.PHONE,
+    ]
+    assert [item.redacted_value for item in phones] == ["[PHONE]", "[PHONE]"]
+    assert [item.image_region for item in phones] == [
+        segments.segments[0].image_region,
+        segments.segments[1].image_region,
+    ]
+
+
+@pytest.mark.parametrize(
+    ("policy", "expected_has_value", "expected_redacted"),
+    [
+        (ValuePolicy.RAW, True, None),
+        (ValuePolicy.REDACTED, False, "[PHONE]"),
+        (ValuePolicy.BOTH, True, "[PHONE]"),
+        (ValuePolicy.NEITHER, False, None),
+    ],
+)
+def test_grouped_phone_obeys_value_policy_and_serializes_existing_contract(
+    policy: ValuePolicy,
+    expected_has_value: bool,
+    expected_redacted: str | None,
+) -> None:
+    segments = _result(
+        _positioned_segment("+1 555", left=10, top=20, right=70, bottom=40),
+        _positioned_segment("234 5678", left=74, top=20, right=150, bottom=40),
+    )
+
+    result = analyze_image(
+        "synthetic.png",
+        ocr=FakeOCR(segments),
+        ner=FakeNER(),
+        value_policy=policy,
+    )
+
+    (phone,) = [item for item in result.findings if item.category is FindingCategory.PHONE]
+    assert (phone.value is not None) == expected_has_value
+    assert phone.redacted_value == expected_redacted
+    payload = to_risk_fusion_ocr_payload(result)
+    assert payload["status"] == "OK"
+    serialized = next(item for item in payload["findings"] if item["type"] == "phone")
+    serialized_redacted = serialized["redacted_text"]
+    assert (serialized_redacted is not None) == (expected_redacted is not None)
+    if expected_redacted is not None:
+        assert serialized_redacted == "[PHONE]"
+    assert serialized["bbox"] == [10.0, 20.0, 150.0, 40.0]
+    assert "source_segment_index" not in serialized
+    assert serialized["span"] == {"start": 0, "end": len("+1 555 234 5678")}
+
+
+def test_grouped_phone_detector_failure_returns_only_safe_error() -> None:
+    segments = _result(
+        _positioned_segment("+1 555", left=0, top=0, right=60, bottom=20),
+        _positioned_segment("234 5678", left=63, top=0, right=140, bottom=20),
+    )
+
+    def fail_grouped(text: str, *, value_policy: ValuePolicy) -> list[Finding]:
+        if " " in text:
+            raise RuntimeError("private synthetic value")
+        from aegis_ocr.pii import detect_phones
+
+        return detect_phones(text, value_policy=value_policy)
+
+    result = analyze_image(
+        "synthetic.png",
+        ocr=FakeOCR(segments),
+        phone_detector=fail_grouped,
+        ner=FakeNER(),
+    )
+
+    assert result.status is PipelineStatus.PARTIAL
+    assert result.findings == ()
+    assert result.errors[0].code == "phone_detector_failed"
+    assert "private synthetic value" not in result.errors[0].message
 
 
 def test_repeated_same_local_entity_across_segments_is_preserved() -> None:
@@ -203,6 +417,22 @@ def test_partial_ocr_with_segments_preserves_results_and_safe_error() -> None:
     assert [item.category for item in result.findings] == [FindingCategory.PERSON_NAME]
     assert result.errors == (
         PipelineError("ocr_failed", "The OCR engine could not process this image.", "ocr"),
+    )
+
+
+def test_partial_ocr_tile_error_keeps_specific_safe_error_code() -> None:
+    segment = _segment("synthetic")
+    ocr_result = OCRResult(
+        PipelineStatus.PARTIAL,
+        (segment,),
+        (PipelineError("ocr_partial", "private detail", "ocr"),),
+    )
+
+    result = analyze_image("synthetic.png", ocr=FakeOCR(ocr_result), ner=FakeNER())
+
+    assert result.status is PipelineStatus.PARTIAL
+    assert result.errors == (
+        PipelineError("ocr_partial", "OCR returned a partial result.", "ocr"),
     )
 
 
