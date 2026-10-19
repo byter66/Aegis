@@ -4,10 +4,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from PIL import Image
+from PIL import Image, ImageDraw
 import pytest
 
-from aegis_ocr.ocr import EasyOCREngine, OCRResult, OCRSegment
+from aegis_ocr.ocr import EasyOCREngine, OCRResult, OCRSegment, _tile_starts
 from aegis_ocr.schema import (
     Finding,
     FindingCategory,
@@ -22,11 +22,11 @@ class StubReader:
     def __init__(self, results: list[object] | None = None, error: Exception | None = None) -> None:
         self.results = results or []
         self.error = error
-        self.calls: list[tuple[str, int, bool]] = []
+        self.calls: list[tuple[object, int, bool]] = []
         self.options: list[dict[str, object]] = []
 
     def readtext(
-        self, image: str, *, detail: int, paragraph: bool, **kwargs: object
+        self, image: object, *, detail: int, paragraph: bool, **kwargs: object
     ) -> list[object]:
         self.calls.append((image, detail, paragraph))
         self.options.append(kwargs)
@@ -38,6 +38,21 @@ class StubReader:
 def _write_png(path: Path) -> Path:
     Image.new("RGB", (24, 12), color="white").save(path, format="PNG")
     return path
+
+
+class SequencedReader:
+    def __init__(self, outcomes: list[object]) -> None:
+        self.outcomes = outcomes
+        self.calls: list[object] = []
+
+    def readtext(
+        self, image: object, *, detail: int, paragraph: bool, **kwargs: object
+    ) -> list[object]:
+        self.calls.append(image)
+        outcome = self.outcomes[len(self.calls) - 1]
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome  # type: ignore[return-value]
 
 
 def _box(left: int, top: int, right: int, bottom: int) -> list[tuple[int, int]]:
@@ -118,6 +133,174 @@ def test_configured_canvas_size_is_forwarded_to_readtext(tmp_path: Path) -> None
     assert result.status is PipelineStatus.OK
     assert reader.calls == [(str(image), 1, False)]
     assert reader.options == [{"canvas_size": 1280}]
+
+
+@pytest.mark.parametrize(
+    "configuration",
+    [
+        {"tile_size": True},
+        {"tile_size": 0},
+        {"tile_size": -1},
+        {"tile_size": 1.5},
+        {"tile_size": "10"},
+        {"tile_size": 10, "tile_overlap": True},
+        {"tile_size": 10, "tile_overlap": -1},
+        {"tile_size": 10, "tile_overlap": 1.5},
+        {"tile_size": 10, "tile_overlap": 10},
+        {"tile_overlap": 1},
+    ],
+)
+def test_invalid_tiling_configuration_is_rejected(configuration: dict[str, object]) -> None:
+    with pytest.raises(ValueError):
+        EasyOCREngine(**configuration)  # type: ignore[arg-type]
+
+
+def test_tiling_uses_bounded_regions_and_covers_every_source_pixel(tmp_path: Path) -> None:
+    image_path = tmp_path / "coordinate-grid.png"
+    source = Image.new("RGB", (23, 17))
+    source.putdata([(x, y, 0) for y in range(17) for x in range(23)])
+    source.save(image_path)
+    reader = StubReader()
+    factory_calls: list[tuple[list[str], bool]] = []
+
+    def factory(languages: list[str], *, gpu: bool) -> StubReader:
+        factory_calls.append((languages, gpu))
+        return reader
+
+    engine = EasyOCREngine(reader_factory=factory, tile_size=10, tile_overlap=3)
+    assert factory_calls == []
+
+    result = engine.extract(image_path)
+
+    assert result.status is PipelineStatus.OK
+    assert factory_calls == [(["en"], False)]
+    assert len(reader.calls) == 6
+    covered: set[tuple[int, int]] = set()
+    for tile, _, _ in reader.calls:
+        assert not isinstance(tile, str)
+        height, width = tile.shape[:2]
+        assert width <= 10
+        assert height <= 10
+        covered.update(
+            (int(pixel[2]), int(pixel[1]))
+            for row in tile
+            for pixel in row
+        )
+    assert covered == {(x, y) for y in range(17) for x in range(23)}
+
+
+@pytest.mark.parametrize("length", [800, 1600, 1601, 1844, 3072, 4096, 6144, 8192])
+@pytest.mark.parametrize("overlap", [0, 128])
+def test_tile_intervals_cover_axis_without_excessive_overlap(
+    length: int, overlap: int
+) -> None:
+    tile_size = 1600
+
+    starts = _tile_starts(length, tile_size, overlap)
+    intervals = [(start, min(start + tile_size, length)) for start in starts]
+
+    assert starts[0] == 0
+    assert len(starts) == len(set(starts))
+    assert all(start < end <= length for start, end in intervals)
+    assert intervals[-1][1] == length
+    for (start, end), (next_start, next_end) in zip(intervals, intervals[1:]):
+        assert start < next_start
+        assert next_start <= end  # no uncovered pixel gap
+        assert end - next_start <= overlap
+        assert next_end > end  # each tile contributes new pixels
+
+
+def test_tiled_detections_map_coordinates_deduplicate_overlap_and_keep_edge_text(
+    tmp_path: Path,
+) -> None:
+    image_path = tmp_path / "large-synthetic-labeled.png"
+    source = Image.new("RGB", (32, 20), "white")
+    draw = ImageDraw.Draw(source)
+    draw.text((1, 1), "First", fill="black")
+    draw.text((13, 5), "Overlap", fill="black")
+    draw.text((25, 14), "E", fill="black")
+    source.save(image_path)
+
+    outcomes: list[object] = [[] for _ in range(6)]
+    outcomes[0] = [
+        (_box(1, 1, 3, 3), "first", 0.8),
+        (_box(13, 5, 15, 7), "repeat", 0.8),
+    ]
+    # The second x tile starts at 12: one duplicate and one separate instance.
+    outcomes[1] = [
+        (_box(1, 5, 3, 7), "repeat", 0.9),
+        (_box(7, 5, 9, 7), "repeat", 0.7),
+    ]
+    # The final tile covers the right and bottom image edges.
+    outcomes[5] = [(_box(6, 4, 8, 8), "edge", 0.6)]
+    reader = SequencedReader(outcomes)
+
+    result = EasyOCREngine(
+        reader=reader, tile_size=16, tile_overlap=4
+    ).extract(image_path)
+
+    assert result.status is PipelineStatus.OK
+    assert [segment.text for segment in result.segments] == [
+        "first",
+        "repeat",
+        "repeat",
+        "edge",
+    ]
+    polygons = [segment.image_region.polygon for segment in result.segments]
+    assert polygons[0] == tuple((float(x), float(y)) for x, y in _box(1, 1, 3, 3))
+    # The duplicate keeps the higher-confidence overlap result at original x=13.
+    assert polygons[1] == tuple((float(x), float(y)) for x, y in _box(13, 5, 15, 7))
+    # The same text at a separate location is not treated as a duplicate.
+    assert polygons[2] == tuple((float(x), float(y)) for x, y in _box(19, 5, 21, 7))
+    # Final edge tile reaches the source image's right edge without exceeding it.
+    assert polygons[3] == tuple((float(x), float(y)) for x, y in _box(30, 16, 32, 20))
+    assert all(0 <= x <= 32 and 0 <= y <= 20 for polygon in polygons for x, y in polygon)
+    assert len(reader.calls) == 6
+
+
+def test_tiled_partial_failure_preserves_successful_segments_and_safe_error(
+    tmp_path: Path,
+) -> None:
+    image = _write_png(tmp_path / "partial-tiles.png")
+    outcomes: list[object] = [
+        RuntimeError("private recognized text"),
+        [(_box(1, 1, 4, 4), "synthetic", 0.8)],
+        [],
+        [],
+        [],
+        [],
+    ]
+    reader = SequencedReader(outcomes)
+
+    result = EasyOCREngine(reader=reader, tile_size=10, tile_overlap=2).extract(image)
+
+    assert result.status is PipelineStatus.PARTIAL
+    assert [segment.text for segment in result.segments] == ["synthetic"]
+    assert result.errors[0].code == "ocr_partial"
+    assert "private recognized text" not in result.errors[0].message
+
+
+def test_all_tiled_inference_failures_return_safe_ocr_error(tmp_path: Path) -> None:
+    image = _write_png(tmp_path / "all-tiles-fail.png")
+    reader = SequencedReader([RuntimeError("sensitive text")] * 6)
+
+    result = EasyOCREngine(reader=reader, tile_size=10, tile_overlap=2).extract(image)
+
+    assert result.status is PipelineStatus.ERROR
+    assert result.segments == ()
+    assert result.errors[0].code == "ocr_failed"
+    assert "sensitive text" not in result.errors[0].message
+
+
+def test_successful_tiled_empty_scan_is_ok_without_findings(tmp_path: Path) -> None:
+    image = _write_png(tmp_path / "empty-tiles.png")
+    reader = SequencedReader([[], [], [], [], [], []])
+
+    result = EasyOCREngine(reader=reader, tile_size=10, tile_overlap=2).extract(image)
+
+    assert result.status is PipelineStatus.OK
+    assert result.segments == ()
+    assert result.errors == ()
 
 
 def test_multiple_segments_preserve_engine_order_scores_and_polygons(tmp_path: Path) -> None:
