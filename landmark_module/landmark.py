@@ -1,21 +1,11 @@
 import os, json
 import numpy as np
-import torch
 from PIL import Image
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image
-from tensorflow.keras.applications.resnet50 import preprocess_input
-from transformers import CLIPModel, CLIPProcessor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-model = load_model(os.path.join(HERE, "models", "landmark_model.keras"))
-class_names = json.load(open(os.path.join(HERE, "models", "class_names.json")))
 THRESHOLD = 0.70
-CNN_OK = True
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-clip = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device).eval()
-proc = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+_CNN = None
+_CLIP = None
 
 places = ["Taj Mahal", "Red Fort", "India Gate", "Gateway of India", "Hawa Mahal", "Charminar", "Qutb Minar", "Victoria Memorial", "Mysore Palace", "Chinese fishing nets in Fort Kochi", "Fort Kochi", "Vagamon", "IIIT Kottayam", "Pala", "Saudi Arabia", "Melbourne", "Qatar", "Kochi International Airport", "Kottayam Railway Station"]
 
@@ -40,8 +30,9 @@ def scene_score(img_path):
     probs = clip_scores(img_path, prompts)
     return round(float(probs[:len(revealing)].sum()), 3)
 
-
 def clip_scores(img_path, prompts):
+    import torch
+    clip, proc, device = _get_clip()
     inputs = proc(text=prompts, images=Image.open(img_path).convert("RGB"),
                   return_tensors="pt", padding=True).to(device)
     with torch.no_grad():
@@ -55,16 +46,34 @@ def clip_landmark(img_path, threshold=0.5):
             "landmark_confidence": round(float(probs[i]), 3),
             "landmark_name": places[i] if is_place else None}
 
+VERIFY = True
+NO_VERIFY = set()
+VERIFY_NEG = ["a church", "a temple", "a mosque", "an ordinary building",
+              "a house", "an ordinary street", "a landscape", "a bridge"]
+
+def clip_verify(img_path, name):
+    label = name.replace("_", " ")
+    probs = clip_scores(img_path, [f"a photo of {label}"] + [f"a photo of {n}" for n in VERIFY_NEG])
+    return int(probs.argmax()) == 0
+
 def landmark_flag(img_path):
+    from tensorflow.keras.preprocessing import image
+    from tensorflow.keras.applications.resnet50 import preprocess_input
+    model, class_names = _get_cnn()
     img = image.load_img(img_path, target_size=(224, 224))
     arr = preprocess_input(np.expand_dims(image.img_to_array(img), 0))
     p = model.predict(arr, verbose=0)[0]
-    conf = float(p.max())
-    return {
-        "landmark_flag": conf >= THRESHOLD,
-        "landmark_confidence": round(conf, 3),
-        "landmark_name": class_names[int(p.argmax())] if conf >= THRESHOLD else None,
-    }
+    none_i = class_names.index("none") if "none" in class_names else None
+    top = int(p.argmax())
+    q = p.copy()
+    if none_i is not None:
+        q[none_i] = 0.0                       # report the best monument, not 'none'
+    j = int(q.argmax()); conf = float(q[j]); name = class_names[j]
+    ok = conf >= THRESHOLD and top != none_i  # 'none' winning means no landmark
+    if ok and VERIFY and name not in NO_VERIFY:
+        ok = clip_verify(img_path, name)
+    return {"landmark_flag": ok, "landmark_confidence": round(conf, 3),
+            "landmark_name": name if ok else None}
 
 def landmark_module(img_path):
     c = landmark_flag(img_path)
@@ -83,37 +92,49 @@ def _clean_name(name):
     name = str(name).replace("Category:", "").replace("_", " ").strip()
     return name or None
 
+def _error_payload(code, message):
+    return {"landmark": {"status": "ERROR", "detected": False, "name": None,
+                         "confidence": 0.0, "error": {"code": code, "message": message},
+                         "source": None, "raw_confidence": 0.0},
+            "scene": {"score": None}}
+
 def landmark_payload(img_path):
-    """Returns {"landmark": {...}, "scene": {...}} for Risk Fusion. Never raises."""
     try:
         if not os.path.exists(img_path):
             raise FileNotFoundError(img_path)
-
-        lm = landmark_module(img_path)              # CNN + CLIP merge
+        lm = landmark_module(img_path)
         raw = float(lm["landmark_confidence"])
         scene = round(float(lm["location_revealing_scene"]), 3)
         detected = bool(lm["landmark_flag"]) and raw >= 0.40
-
-        landmark = {
-            "status": "OK",
-            "detected": detected,
-            "name": _clean_name(lm["landmark_name"]) if detected else None,
-            "confidence": round(raw, 3) if detected else 0.0,
-            "error": None,
-            "source": lm["landmark_source"] if detected else None,
-            "raw_confidence": round(raw, 3),
-        }
+        landmark = {"status": "OK", "detected": detected,
+                    "name": _clean_name(lm["landmark_name"]) if detected else None,
+                    "confidence": round(raw, 3) if detected else 0.0,
+                    "error": None,
+                    "source": lm["landmark_source"] if detected else None,
+                    "raw_confidence": round(raw, 3)}
         return {"landmark": landmark, "scene": {"score": scene}}
-
+    except ImportError:
+        return _error_payload("DEPENDENCY_MISSING",
+                              "Required deep learning runtime (TensorFlow/PyTorch/Transformers) is not available.")
     except Exception as e:
-        return {
-            "landmark": {
-                "status": "ERROR", "detected": False, "name": None,
-                "confidence": 0.0,
-                "error": {"code": "INFERENCE_FAILED",
-                          "message": f"Failed to process image: {type(e).__name__}"},
-                "source": None, "raw_confidence": 0.0,
-            },
-            "scene": {"score": None},
-        }
+        return _error_payload("INFERENCE_FAILED", f"Failed to process image: {type(e).__name__}")
 
+def _get_cnn():
+    global _CNN
+    if _CNN is None:
+        from tensorflow.keras.models import load_model
+        m = load_model(os.path.join(HERE, "models", "landmark_model.keras"))
+        names = json.load(open(os.path.join(HERE, "models", "class_names.json")))
+        _CNN = (m, names)
+    return _CNN
+
+def _get_clip():
+    global _CLIP
+    if _CLIP is None:
+        import torch
+        from transformers import CLIPModel, CLIPProcessor
+        dev = "cuda" if torch.cuda.is_available() else "cpu"
+        m = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(dev).eval()
+        p = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+        _CLIP = (m, p, dev)
+    return _CLIP
