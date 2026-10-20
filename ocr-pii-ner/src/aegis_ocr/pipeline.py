@@ -9,7 +9,7 @@ from typing import Protocol
 
 from .ner import SpacyNERAdapter
 from .ocr import EasyOCREngine, OCRResult, OCRSegment
-from .pii import detect_emails, detect_phones
+from .pii import detect_addresses, detect_emails, detect_phones
 from .schema import (
     Finding,
     FindingCategory,
@@ -34,6 +34,9 @@ _SAFE_COMPONENT_ERRORS: dict[tuple[str, str], str] = {
     ("ocr_partial", "ocr"): "OCR returned a partial result.",
     ("ner_model_unavailable", "ner_model"): "The English NER model is unavailable.",
     ("ner_failed", "ner"): "The NER model could not process this text.",
+    ("address_detector_failed", "address_detector"): (
+        "The address detector could not process this OCR segment."
+    ),
 }
 
 
@@ -52,6 +55,7 @@ class _NEREngine(Protocol):
 
 EmailDetector = Callable[..., object]
 PhoneDetector = Callable[..., object]
+AddressDetector = Callable[..., object]
 
 _MAX_PHONE_GROUP_SEGMENTS = 3
 _PHONE_LINE_OVERLAP_RATIO = 0.5
@@ -70,10 +74,11 @@ def analyze_image(
     ocr: _OCREngine | None = None,
     email_detector: EmailDetector = detect_emails,
     phone_detector: PhoneDetector = detect_phones,
+    address_detector: AddressDetector = detect_addresses,
     ner: _NEREngine | None = None,
     value_policy: ValuePolicy = ValuePolicy.REDACTED,
 ) -> PipelineResult:
-    """Run OCR and detectors on each returned OCR segment.
+    """Run OCR, PII candidate detectors, and person-name NER per segment.
 
     Email and person-name detection stays segment-local. Phone detection also
     checks bounded groups of spatially adjacent same-line OCR segments. A
@@ -149,6 +154,12 @@ def analyze_image(
         for detector, expected_category, detector_name, failure_code in (
             (email_detector, FindingCategory.EMAIL, "email", "email_detector_failed"),
             (phone_detector, FindingCategory.PHONE, "phone", "phone_detector_failed"),
+            (
+                address_detector,
+                FindingCategory.ADDRESS,
+                "address",
+                "address_detector_failed",
+            ),
         ):
             try:
                 output = detector(segment.text, value_policy=value_policy)

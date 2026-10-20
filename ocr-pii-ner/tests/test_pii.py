@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from aegis_ocr.pii import detect_emails, detect_phones
+import pytest
+
+from aegis_ocr.pii import detect_addresses, detect_emails, detect_phones
 from aegis_ocr.schema import FindingCategory, ValuePolicy
 
 
@@ -85,3 +87,63 @@ def test_raw_value_is_opt_in_and_detector_does_not_log(capsys) -> None:
     captured = capsys.readouterr()
     assert sensitive not in captured.out
     assert sensitive not in captured.err
+
+
+def test_address_candidates_have_exact_spans_and_conservative_patterns() -> None:
+    text = "Ship to 42 Main Street; City: Springfield; PIN Code: 560001."
+    findings = detect_addresses(text)
+
+    assert [text[item.span.start:item.span.end] for item in findings] == [
+        "42 Main Street",
+        "Springfield",
+        "560001",
+    ]
+    assert all(item.category is FindingCategory.ADDRESS for item in findings)
+    assert all(item.detector == "address_candidate_regex" for item in findings)
+    assert all(item.value is None and item.redacted_value == "[ADDRESS]" for item in findings)
+
+
+def test_address_candidates_reject_unlabelled_numbers_and_place_names() -> None:
+    for text in (
+        "Order 123456; reference 560001",
+        "Springfield is a fictional place",
+        "Main Street without a number",
+        "ZIP 12345 without a label delimiter",
+    ):
+        assert detect_addresses(text) == []
+
+
+def test_overlapping_address_patterns_emit_one_candidate() -> None:
+    text = "Address: 42 Main Street"
+    findings = detect_addresses(text)
+
+    assert len(findings) == 1
+    assert text[findings[0].span.start:findings[0].span.end] == "42 Main Street"
+
+
+@pytest.mark.parametrize(
+    ("policy", "expected_raw", "expected_redacted"),
+    [
+        (ValuePolicy.RAW, "42 Main Street", None),
+        (ValuePolicy.REDACTED, None, "[ADDRESS]"),
+        (ValuePolicy.BOTH, "42 Main Street", "[ADDRESS]"),
+        (ValuePolicy.NEITHER, None, None),
+    ],
+)
+def test_address_candidates_respect_value_policy(
+    policy: ValuePolicy, expected_raw: str | None, expected_redacted: str | None
+) -> None:
+    (finding,) = detect_addresses("42 Main Street", value_policy=policy)
+    assert finding.value == expected_raw
+    assert finding.redacted_value == expected_redacted
+
+
+@pytest.mark.parametrize("invalid_text", [None, 42, object()])
+def test_address_detector_rejects_non_string_input(invalid_text: object) -> None:
+    with pytest.raises(TypeError, match="text must be a string"):
+        detect_addresses(invalid_text)  # type: ignore[arg-type]
+
+
+def test_address_detector_rejects_invalid_value_policy() -> None:
+    with pytest.raises(TypeError, match="value_policy must be a ValuePolicy"):
+        detect_addresses("no candidates", value_policy="raw")  # type: ignore[arg-type]

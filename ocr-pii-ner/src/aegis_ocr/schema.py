@@ -18,6 +18,7 @@ class FindingCategory(str, Enum):
     EMAIL = "email"
     PHONE = "phone"
     PERSON_NAME = "person_name"
+    ADDRESS = "address"
 
 
 class PipelineStatus(str, Enum):

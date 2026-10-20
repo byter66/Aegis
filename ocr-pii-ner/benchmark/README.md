@@ -43,7 +43,7 @@ Choose fresh writable basetemp paths for each run and remove only those paths af
 
 ## Limits and next validation
 
-Forty synthetic images are a manageable engineering pilot, not evidence of real-world accuracy. Clean digital fonts do not capture camera blur, perspective, glare, compression, handwriting, diverse document layouts, language variation, unusual typography, or OCR hallucinations. The controlled phone splits test one segmentation pattern only. After this pilot, validate with a separate, appropriately consented real-image set that is manually labelled, access-controlled, and reviewed for privacy. Report category metrics and failure cases without retaining or publishing raw PII. Do not infer that zero findings means an image is safe to post.
+The 28-image synthetic development snapshot is a manageable engineering pilot, not evidence of real-world accuracy. Clean digital fonts do not capture camera blur, perspective, glare, compression, handwriting, diverse document layouts, language variation, unusual typography, or OCR hallucinations. The controlled phone splits test one segmentation pattern only. After this pilot, validate with a separate, appropriately consented real-image set that is manually labelled, access-controlled, and reviewed for privacy. Report category metrics and failure cases without retaining or publishing raw PII. Do not infer that zero findings means an image is safe to post.
 
 ## Opt-in OCR stage timings
 

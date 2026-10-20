@@ -23,6 +23,7 @@ _VERSION = "1.0"
         (FindingCategory.EMAIL, "email", "person@example.invalid", "[EMAIL]"),
         (FindingCategory.PHONE, "phone", "+12025550123", "[PHONE]"),
         (FindingCategory.PERSON_NAME, "person_name", "Ada Example", "[PERSON_NAME]"),
+        (FindingCategory.ADDRESS, "address", "42 Main Street", "[ADDRESS]"),
     ],
 )
 def test_serializes_supported_categories_with_fixed_confidence_and_redaction(

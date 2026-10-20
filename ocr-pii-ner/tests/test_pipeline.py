@@ -121,6 +121,62 @@ def test_combines_all_finding_types_with_segment_provenance() -> None:
     ]
 
 
+def test_address_detector_runs_per_segment_and_preserves_policy_and_provenance() -> None:
+    first_text = "Deliver to 42 Main Street"
+    second_text = "Mail to 7 Oak Avenue"
+    first_segment = _segment(first_text, confidence=0.83, x=12)
+    second_segment = _segment(second_text, confidence=0.72, x=140)
+
+    result = analyze_image(
+        "synthetic.png",
+        ocr=FakeOCR(_result(first_segment, second_segment)),
+        ner=FakeNER(),
+        value_policy=ValuePolicy.BOTH,
+    )
+
+    findings = [item for item in result.findings if item.category is FindingCategory.ADDRESS]
+    assert result.status is PipelineStatus.OK
+    assert len(findings) == 2
+    assert [
+        (first_text if finding.source_segment_index == 0 else second_text)[
+            finding.span.start:finding.span.end
+        ]
+        for finding in findings
+    ] == ["42 Main Street", "7 Oak Avenue"]
+    assert [finding.value for finding in findings] == ["42 Main Street", "7 Oak Avenue"]
+    assert [finding.redacted_value for finding in findings] == ["[ADDRESS]", "[ADDRESS]"]
+    assert [finding.source_segment_index for finding in findings] == [0, 1]
+    assert [finding.image_region for finding in findings] == [
+        first_segment.image_region,
+        second_segment.image_region,
+    ]
+    assert [finding.ocr_confidence for finding in findings] == [0.83, 0.72]
+
+
+def test_address_detector_failure_is_sanitized_and_serializable() -> None:
+    secret = "synthetic private address"
+
+    def fail_address(_text: str, *, value_policy: ValuePolicy) -> list[Finding]:
+        raise RuntimeError(secret)
+
+    result = analyze_image(
+        "synthetic.png",
+        ocr=FakeOCR(_result(_segment("42 Main Street"))),
+        ner=FakeNER(),
+        address_detector=fail_address,
+    )
+
+    assert result.status is PipelineStatus.PARTIAL
+    assert not any(item.category is FindingCategory.ADDRESS for item in result.findings)
+    assert result.errors[0].code == "address_detector_failed"
+    assert secret not in result.errors[0].message
+    payload = to_risk_fusion_ocr_payload(result)
+    assert payload["error"] == {
+        "code": "address_detector_failed",
+        "message": "OCR/PII analysis completed with one or more errors.",
+    }
+
+
 def test_two_adjacent_same_line_segments_detect_split_phone_with_union_region() -> None:
     first = _positioned_segment("+1 555", left=10, top=20, right=70, bottom=40)
     second = _positioned_segment("234 5678", left=74, top=21, right=150, bottom=41)
@@ -595,6 +651,7 @@ def test_all_detector_failures_return_error_without_exception_details() -> None:
         ocr=FakeOCR(_result(_segment(text))),
         email_detector=failure,
         phone_detector=failure,
+        address_detector=failure,
         ner=ner,
     )
 
@@ -603,6 +660,7 @@ def test_all_detector_failures_return_error_without_exception_details() -> None:
     assert {error.code for error in result.errors} == {
         "email_detector_failed",
         "phone_detector_failed",
+        "address_detector_failed",
         "ner_failed",
     }
     assert all(text not in error.message for error in result.errors)
