@@ -29,6 +29,34 @@ _PHONE_CANDIDATE = re.compile(
     r"(?![A-Za-z0-9])"
 )
 
+_STREET_ADDRESS = re.compile(
+    r"(?<![A-Za-z0-9])\d{1,6}\s+"
+    r"(?:[A-Za-z0-9][A-Za-z0-9.'-]*\s+){1,4}"
+    r"(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|"
+    r"Court|Ct|Circle|Cir|Way|Terrace|Ter|Place|Pl|Highway|Hwy)\b"
+    r"(?:\s+(?:Apt|Apartment|Unit|Suite|Ste|#)\s*[A-Za-z0-9-]+)?",
+    re.IGNORECASE,
+)
+_LABELLED_STREET_ADDRESS = re.compile(
+    r"\b(?:street\s+address|mailing\s+address|address)\s*:\s*"
+    r"(?P<candidate>\d{1,6}\s+"
+    r"(?:[A-Za-z0-9][A-Za-z0-9.'-]*\s+){1,4}"
+    r"(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|"
+    r"Court|Ct|Circle|Cir|Way|Terrace|Ter|Place|Pl|Highway|Hwy)\b"
+    r"(?:\s+(?:Apt|Apartment|Unit|Suite|Ste|#)\s*[A-Za-z0-9-]+)?)",
+    re.IGNORECASE,
+)
+_LABELLED_LOCALITY = re.compile(
+    r"\b(?:city|locality|town)\s*:\s*"
+    r"(?P<candidate>[A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){0,3})",
+    re.IGNORECASE,
+)
+_LABELLED_POSTAL_CODE = re.compile(
+    r"\b(?:ZIP(?:\s+code)?|postal(?:\s+code)?|PIN(?:\s+code)?)\s*[:#-]\s*"
+    r"(?P<candidate>(?:\d{5}(?:-\d{4})?|\d{6}))\b",
+    re.IGNORECASE,
+)
+
 
 def detect_emails(
     text: str,
@@ -102,6 +130,64 @@ def detect_phones(
             Finding(
                 category=FindingCategory.PHONE,
                 detector="phone_international_candidate",
+                span=TextSpan(start, end),
+                value=value,
+                redacted_value=redacted,
+            )
+        )
+    return findings
+
+
+def detect_addresses(
+    text: str,
+    *,
+    value_policy: ValuePolicy = ValuePolicy.REDACTED,
+) -> list[Finding]:
+    """Find conservative address candidates, not validated postal addresses.
+
+    Candidates are numbered street addresses with a recognized street suffix,
+    explicitly labelled localities, or explicitly labelled postal/PIN codes.
+    Unlabelled numbers and place names are intentionally not sufficient.
+    """
+
+    if not isinstance(text, str):
+        raise TypeError("text must be a string")
+    if not isinstance(value_policy, ValuePolicy):
+        raise TypeError("value_policy must be a ValuePolicy")
+
+    candidates: list[tuple[int, int]] = []
+    for pattern in (
+        _STREET_ADDRESS,
+        _LABELLED_STREET_ADDRESS,
+        _LABELLED_LOCALITY,
+        _LABELLED_POSTAL_CODE,
+    ):
+        for match in pattern.finditer(text):
+            if "candidate" in match.re.groupindex:
+                start, end = match.span("candidate")
+            else:
+                start, end = match.span()
+            if start < end:
+                candidates.append((start, end))
+
+    # A labelled street match and the unlabelled street pattern can identify
+    # the same text. Coalesce overlaps so one candidate produces one finding.
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(candidates):
+        if merged and start < merged[-1][1]:
+            previous_start, previous_end = merged[-1]
+            merged[-1] = (previous_start, max(previous_end, end))
+        else:
+            merged.append((start, end))
+
+    findings: list[Finding] = []
+    for start, end in merged:
+        candidate = text[start:end]
+        value, redacted = apply_value_policy(candidate, "[ADDRESS]", value_policy)
+        findings.append(
+            Finding(
+                category=FindingCategory.ADDRESS,
+                detector="address_candidate_regex",
                 span=TextSpan(start, end),
                 value=value,
                 redacted_value=redacted,

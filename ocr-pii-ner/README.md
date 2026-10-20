@@ -1,6 +1,6 @@
 # Aegis OCR + PII/NER module
 
-This standalone Python package provides a findings schema, email and phone detectors, an EasyOCR adapter, an English person-name NER adapter, an OCR-to-findings pipeline, and a serializer for the Risk Fusion `ocr_ner` payload.
+This standalone Python package provides a findings schema, email, phone, and conservative address-candidate detectors, an EasyOCR adapter, an English person-name NER adapter, an OCR-to-findings pipeline, and a serializer for the Risk Fusion `ocr_ner` payload.
 
 ## Setup
 
@@ -22,7 +22,7 @@ EasyOCR may fetch its pretrained OCR weights when the reader is first initialize
 
 ## Public API example
 
-`analyze_image(image_path, *, ocr=None, email_detector=detect_emails, phone_detector=detect_phones, ner=None, value_policy=ValuePolicy.REDACTED)` accepts one local JPEG (`.jpg`/`.jpeg`) or PNG (`.png`) image path. The defaults construct an EasyOCR engine and spaCy NER adapter; OCR and NER can also be injected. This example prompts for the path of an existing supported image and inspects the returned status and findings without assuming any will be found:
+`analyze_image(image_path, *, ocr=None, email_detector=detect_emails, phone_detector=detect_phones, address_detector=detect_addresses, ner=None, value_policy=ValuePolicy.REDACTED)` accepts one local JPEG (`.jpg`/`.jpeg`) or PNG (`.png`) image path. The defaults construct an EasyOCR engine and spaCy NER adapter; OCR, detectors, and NER can also be injected. This example prompts for the path of an existing supported image and inspects the returned status and findings without assuming any will be found:
 
 ```python
 from pathlib import Path
@@ -51,7 +51,7 @@ if result.errors:
 # REDACTED keeps only `redacted_value`; BOTH keeps both; NEITHER keeps neither.
 ```
 
-The default `REDACTED` policy exposes detector-provided redacted representations in `finding.redacted_value` and clears `finding.value`. The other policies control those same two fields. Do not select `RAW` or `BOTH` unless the caller is prepared to protect the raw values. The email and phone detectors use `[EMAIL]` and `[PHONE]` as their redaction markers; person-name findings use the representation provided by the NER adapter. Findings are returned as typed objects. `to_risk_fusion_ocr_payload` serializes a `PipelineResult` to the nested `ocr_ner` contract; raw finding values and component error messages are omitted.
+The default `REDACTED` policy exposes detector-provided redacted representations in `finding.redacted_value` and clears `finding.value`. The other policies control those same two fields. Do not select `RAW` or `BOTH` unless the caller is prepared to protect the raw values. The email, phone, and address detectors use `[EMAIL]`, `[PHONE]`, and `[ADDRESS]` as their redaction markers; person-name findings use the representation provided by the NER adapter. Findings are returned as typed objects. `to_risk_fusion_ocr_payload` serializes a `PipelineResult` to the nested `ocr_ner` contract; raw finding values and component error messages are omitted.
 
 ### Opt-in tiled OCR
 
@@ -70,7 +70,7 @@ Tiling does not downscale the source image, but it is not guaranteed to detect e
 
 ## Pipeline behavior
 
-`analyze_image` runs email and person-name detection independently on each OCR segment. Phone detection also checks windows of two or three segments when their boxes are on the same visual line, have at least 50% vertical overlap, and have a horizontal gap no greater than 1.5 times the taller box. Grouped text is separated with spaces and still uses the existing explicit international phone candidate rules. Detections are deduplicated against the same character spans in contributing segments, so repeated numbers at separate positions remain separate findings.
+`analyze_image` runs email, address-candidate, and person-name detection independently on each OCR segment. Phone detection also checks windows of two or three segments when their boxes are on the same visual line, have at least 50% vertical overlap, and have a horizontal gap no greater than 1.5 times the taller box. Grouped text is separated with spaces and still uses the existing explicit international phone candidate rules. Detections are deduplicated against the same character spans in contributing segments, so repeated numbers at separate positions remain separate findings.
 
 A grouped phone finding covers the union of the contributing segment boxes. Since the schema has only one `source_segment_index`, grouped findings set it to `None`; their `span` is relative to temporary joined text, and they carry no OCR confidence. Consumers must use the image region rather than treating that span as local to one source segment. Grouping is intentionally bounded and geometry-based: it can miss numbers split across more segments, lines, or larger gaps, and nearby unrelated text can still produce a false candidate if it forms a valid phone pattern.
 
@@ -86,7 +86,7 @@ Errors use structured codes, stages, and generic messages; raw OCR text, detecte
 
 ## Findings and categories
 
-The supported categories are `email`, `phone`, and provisional `person_name`. The schema carries a detector name, optional raw and redacted values, a text span, optional image region, optional `ocr_confidence`, and optional `detector_score` with required semantics when supplied. Regex matches do not receive invented confidence scores. `PipelineResult` contains a schema version, status, findings, and structured errors; it rejects duplicate findings with the same category, span, and source-segment index.
+The supported categories are `email`, `phone`, address candidates (`address`), and provisional `person_name`. The schema carries a detector name, optional raw and redacted values, a text span, optional image region, optional `ocr_confidence`, and optional `detector_score` with required semantics when supplied. Regex matches do not receive invented confidence scores. `PipelineResult` contains a schema version, status, findings, and structured errors; it rejects duplicate findings with the same category, span, and source-segment index.
 
 The schema and detectors use typed dataclasses and standard-library validation. The package supports Python 3.10 and later; the repository environment has Python 3.14.4. `EasyOCREngine` uses EasyOCR's English reader in CPU mode, initializes it lazily, and reuses it. It is not thread-safe in this MVP; use one engine per worker or synchronize access externally.
 
@@ -94,6 +94,7 @@ The schema and detectors use typed dataclasses and standard-library validation. 
 
 - Email detection covers common unquoted ASCII email forms with basic syntax checks. It is not a complete implementation of email address standards and does not verify mailbox existence.
 - Phone detection accepts only explicit international-format candidates with a `+` prefix and 8–15 digits overall. It does not validate country numbering plans or assigned numbers, and it does not guess local/national formats.
+- Address detection identifies conservative candidates: numbered street forms with a recognized suffix, explicitly labelled city/locality/town values, and explicitly labelled ZIP/postal/PIN codes. It does not validate postal addresses or establish that a candidate is complete or deliverable; false positives and missed formats remain possible.
 - spaCy NER uses the pretrained `en_core_web_sm` pipeline and emits person-name entities only. The model must be installed separately as shown above.
 
 ## Tests
@@ -109,4 +110,4 @@ $env:PYTHONDONTWRITEBYTECODE = "1"
 if ($LASTEXITCODE -ne 0) { throw "pytest failed with exit code $LASTEXITCODE" }
 ```
 
-The OCR tests use mocks and do not download models or perform real OCR inference. This command documents test execution; it does not claim that the suite has been run.
+The ordinary OCR tests use mocks and do not download models or perform real OCR inference. The two tests in `tests/test_ocr_live.py` are marked `live` and skip unless `AEGIS_RUN_LIVE_TESTS=1` is set. They use only synthetic text and images; the EasyOCR smoke test disables model downloads and fails clearly if required local weights are unavailable. This command documents test execution; it does not claim that the suite has been run.

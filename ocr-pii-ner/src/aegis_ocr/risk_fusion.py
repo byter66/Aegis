@@ -17,6 +17,7 @@ _SAFE_ERROR_CODES = frozenset(
         "ocr_partial",
         "email_detector_failed",
         "phone_detector_failed",
+        "address_detector_failed",
         "ner_model_unavailable",
         "ner_failed",
     }

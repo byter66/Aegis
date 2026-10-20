@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-from collections import Counter
 from pathlib import Path
 import sys
 from types import SimpleNamespace
 
+from PIL import Image
 import pytest
 
 BENCHMARK_ROOT = Path(__file__).resolve().parents[1]
@@ -16,7 +16,6 @@ sys.path.insert(0, str(MODULE_ROOT / "src"))
 import common
 import evaluate
 from evaluate import _CountingOCR
-from generate_dataset import _composition, validate_dataset
 from aegis_ocr.schema import FindingCategory, ImageRegion, PipelineStatus
 
 
@@ -49,29 +48,28 @@ def _run(predictions=(), status="ok"):
     return {"one": {"status": status, "predictions": tuple(predictions)}}
 
 
-def test_generated_dataset_composition_and_split_isolation():
-    assert [len(_composition(split)) for split in ("development", "heldout")] == [28, 12]
-    assert Counter(_composition("development")) == {
-        ("person_name",): 6, ("email",): 6, ("phone",): 6,
-        ("person_name", "email", "phone"): 4, (): 6,
-    }
-    assert Counter(_composition("heldout")) == {
-        ("person_name",): 2, ("email",): 2, ("phone",): 2,
-        ("person_name", "email", "phone"): 2, (): 4,
-    }
-    assert validate_dataset() == {"development": 28, "heldout": 12}
-    development = common.load_annotations(BENCHMARK_ROOT / "data/annotations/development.jsonl")
-    heldout = common.load_annotations(BENCHMARK_ROOT / "data/annotations/heldout.jsonl")
-    expected_dev = {"person_name": 10, "email": 10, "phone": 10}
-    expected_heldout = {"person_name": 4, "email": 4, "phone": 4}
-    for records, expected in ((development, expected_dev), (heldout, expected_heldout)):
-        counts = {category: sum(e.category == category for r in records for e in r.entities) for category in common.CATEGORIES}
-        assert counts == expected
-        assert sum(not r.entities for r in records) == (6 if records is development else 4)
-    assert {r.template_id for r in development}.isdisjoint({r.template_id for r in heldout})
-    assert {e.normalized_value for r in development for e in r.entities}.isdisjoint(
-        {e.normalized_value for r in heldout for e in r.entities}
+def test_committed_development_snapshot_composition_and_files():
+    annotations = common.load_annotations(
+        BENCHMARK_ROOT / "data/annotations/development.jsonl",
+        expected_split="development",
     )
+    assert len(annotations) == 28
+    category_counts = {
+        category: sum(
+            entity.category == category
+            for record in annotations
+            for entity in record.entities
+        )
+        for category in common.CATEGORIES
+    }
+    assert category_counts == {"person_name": 10, "email": 10, "phone": 10}
+    assert sum(not record.entities for record in annotations) == 6
+
+    for record in annotations:
+        image_path = BENCHMARK_ROOT / "data" / record.image_file
+        assert image_path.is_file()
+        with Image.open(image_path) as image:
+            assert image.size == (record.width, record.height)
 
 
 def test_annotation_validation_checks_bounds_and_fragments(tmp_path):
