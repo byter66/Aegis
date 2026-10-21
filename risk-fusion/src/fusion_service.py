@@ -2,10 +2,10 @@
 Consumes structured detection outputs from OCR/NER and Landmark modules,
 aggregates PII, handles detector errors, and produces an explainable privacy risk assessment.
 """
+import os
 import joblib
 import pandas as pd
 import numpy as np
-import os
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "fusion_model.joblib")
 
@@ -27,7 +27,8 @@ class AegisRiskFusion:
         Accepts both nested format:
         {
             "ocr_ner": {"status": "OK", "findings": [...], "error": None},
-            "landmark": {"status": "OK", "detected": True, "name": "...", "confidence": 0.85}
+            "landmark": {"status": "OK", "detected": True, "name": "...", "confidence": 0.85},
+            "scene": {"score": 0.75}
         }
         and legacy flat format for backward compatibility.
         """
@@ -64,7 +65,6 @@ class AegisRiskFusion:
             findings = [{"type": t, "confidence": 1.0} for t in flat_types]
 
         # 3. Aggregate unique PII categories without double-counting
-        # Filter findings with confidence >= 0.40
         valid_findings = [f for f in findings if float(f.get("confidence", 1.0) or 1.0) >= 0.40]
         unique_pii_types = set(f.get("type", "").lower() for f in valid_findings if f.get("type"))
 
@@ -74,7 +74,7 @@ class AegisRiskFusion:
         has_name = int("person_name" in unique_pii_types or "name" in unique_pii_types)
         num_pii = len(unique_pii_types)
 
-        # 4. Extract Landmark findings (Supports nested and flat)
+        # 4. Extract Landmark and Scene findings (Supports nested and flat)
         if "landmark" in payload and isinstance(payload["landmark"], dict):
             landmark_flag = bool(payload["landmark"].get("detected", False))
             landmark_conf = float(payload["landmark"].get("confidence", 0.0) or 0.0)
@@ -88,6 +88,11 @@ class AegisRiskFusion:
         if landmark_conf < 0.40:
             landmark_flag = False
             landmark_conf = 0.0
+
+        # Extract Scene score (location-revealing background)
+        scene_score = 0.0
+        if "scene" in payload and isinstance(payload["scene"], dict):
+            scene_score = float(payload["scene"].get("score", 0.0) or 0.0)
 
         # 5. Build feature DataFrame for ML model
         features = pd.DataFrame([{
@@ -106,6 +111,11 @@ class AegisRiskFusion:
         risk_level = self.classes[pred_class_idx]
         continuous_score = int(round((probabilities[1] * 50) + (probabilities[2] * 100)))
 
+        # Factor in revealing background scene for continuous score
+        if scene_score >= 0.50 and risk_level == "Medium":
+            scene_boost = int(round(scene_score * 15))
+            continuous_score = min(continuous_score + scene_boost, 59)
+
         # 7. Generate explainable reasons for the user
         reasons = []
         if has_address:
@@ -118,6 +128,10 @@ class AegisRiskFusion:
             reasons.append("Identifiable personal name detected in text.")
         if landmark_flag and landmark_conf >= 0.50:
             reasons.append(f"Identifiable landmark recognized: {landmark_name} ({int(landmark_conf * 100)}% confidence).")
+        if scene_score >= 0.60:
+            reasons.append(f"Distinct physical surroundings detected ({int(scene_score * 100)}% location-revealing).")
+        if not unique_pii_types and (landmark_flag or scene_score >= 0.50):
+            reasons.append("No sensitive personal contact details or home addresses detected; overall privacy risk remains Medium.")
         if not reasons:
             reasons.append("No sensitive personal identifiers or distinct locations found.")
 
