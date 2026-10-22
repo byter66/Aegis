@@ -62,7 +62,7 @@ def test_committed_development_snapshot_composition_and_files():
         )
         for category in common.CATEGORIES
     }
-    assert category_counts == {"person_name": 10, "email": 10, "phone": 10}
+    assert category_counts == {"person_name": 10, "email": 10, "phone": 10, "address": 0}
     assert sum(not record.entities for record in annotations) == 6
 
     for record in annotations:
@@ -101,6 +101,7 @@ def test_annotation_validation_checks_bounds_and_fragments(tmp_path):
         ("person_name", "  Avery   Sample ", "avery sample"),
         ("email", "Synthetic-Dev-01@Example.Com", "synthetic-dev-01@example.com"),
         ("phone", "+1 (202) 555-0100", "+12025550100"),
+        ("address", "  42 Main   Street, Apt 4B  ", "42 main street, apt 4b"),
     ],
 )
 def test_category_normalization(category, raw, normalized):
@@ -612,3 +613,326 @@ def test_main_reports_relative_and_absolute_output_paths(
     output = capsys.readouterr().out
     expected_display = str(Path("results") / output_path.name)
     assert f"sanitized aggregate report: {expected_display}" in output
+
+
+def test_address_scoring_strict_and_localization():
+    gt = _entity(category="address", value="42 Main Street", box=(10, 10, 100, 40))
+    annotation = _annotation(entities=(gt,))
+
+    # Exact match
+    pred_exact = _prediction(category="address", value="42 Main Street", box=(10, 10, 100, 40))
+    metrics_exact = common.score_results((annotation,), _run((pred_exact,)))
+    strict = metrics_exact["strict"]["per_category"]["address"]
+    localized = metrics_exact["localization_only"]["per_category"]["address"]
+    assert strict == {"tp": 1, "fp": 0, "fn": 0, "precision": 1.0, "recall": 1.0, "f1": 1.0}
+    assert localized["tp"] == 1
+
+    # Transcription mismatch: same box, different address text
+    pred_diff_text = _prediction(category="address", value="99 Other Road", box=(10, 10, 100, 40))
+    metrics_diff = common.score_results((annotation,), _run((pred_diff_text,)))
+    assert metrics_diff["strict"]["per_category"]["address"] == {
+        "tp": 0, "fp": 1, "fn": 1, "precision": 0.0, "recall": 0.0, "f1": 0.0
+    }
+    assert metrics_diff["localization_only"]["per_category"]["address"]["tp"] == 1
+
+    # Degenerate/non-overlapping box: IoU < 0.5
+    pred_bad_box = _prediction(category="address", value="42 Main Street", box=(150, 50, 200, 90))
+    metrics_box = common.score_results((annotation,), _run((pred_bad_box,)))
+    assert metrics_box["strict"]["per_category"]["address"]["tp"] == 0
+    assert metrics_box["localization_only"]["per_category"]["address"]["tp"] == 0
+
+
+def test_macro_f1_with_zero_label_categories():
+    # Only email and phone are labelled; person_name and address have zero labels.
+    annotation = _annotation(
+        entities=(
+            _entity(category="email", value="alex@example.com", box=(0, 0, 100, 40)),
+            _entity(category="phone", value="+1 202-555-0100", box=(0, 50, 100, 90)),
+        )
+    )
+    predictions = (
+        _prediction(category="email", value="alex@example.com", box=(0, 0, 100, 40)),
+        _prediction(category="phone", value="+1 202-555-0100", box=(0, 50, 100, 90)),
+    )
+    metrics = common.score_results((annotation,), _run(predictions))
+    # Both email and phone have F1 = 1.0. Macro F1 must be (1.0 + 1.0) / 2 = 1.0, not 0.5!
+    assert metrics["strict"]["macro_f1"] == 1.0
+    assert metrics["strict"]["per_category"]["address"]["f1"] is None
+    assert metrics["strict"]["per_category"]["address"]["precision"] is None
+    assert metrics["strict"]["per_category"]["address"]["recall"] is None
+    assert metrics["strict"]["per_category"]["person_name"]["f1"] is None
+    assert metrics["strict"]["per_category"]["person_name"]["precision"] is None
+    assert metrics["strict"]["per_category"]["person_name"]["recall"] is None
+
+    # Negative dataset with zero labels across all categories must return 0.0
+    negative_annotation = _annotation(entities=())
+    metrics_neg = common.score_results((negative_annotation,), _run())
+    assert metrics_neg["strict"]["macro_f1"] == 0.0
+
+
+def test_zero_label_category_reporting_with_and_without_false_positives():
+    # Case 1: Category with zero labels and zero false positives -> unscored (None)
+    annotation = _annotation(
+        entities=(
+            _entity(category="email", value="alex@example.com", box=(0, 0, 100, 40)),
+        )
+    )
+    prediction_clean = (
+        _prediction(category="email", value="alex@example.com", box=(0, 0, 100, 40)),
+    )
+    metrics_clean = common.score_results((annotation,), _run(prediction_clean))
+    address_clean = metrics_clean["strict"]["per_category"]["address"]
+    assert address_clean["tp"] == 0
+    assert address_clean["fp"] == 0
+    assert address_clean["fn"] == 0
+    assert address_clean["precision"] is None
+    assert address_clean["recall"] is None
+    assert address_clean["f1"] is None
+    # Verify JSON serialization represents undefined as null
+    serialized_clean = json.dumps(metrics_clean)
+    assert '"precision": null' in serialized_clean
+    assert '"f1": null' in serialized_clean
+
+    # Case 2: Category with zero labels but 1 false positive -> precision=0.0, f1=0.0 (penalty preserved)
+    prediction_with_fp = (
+        _prediction(category="email", value="alex@example.com", box=(0, 0, 100, 40)),
+        _prediction(category="address", value="42 Main Street", box=(10, 10, 80, 40)),
+    )
+    metrics_fp = common.score_results((annotation,), _run(prediction_with_fp))
+    address_fp = metrics_fp["strict"]["per_category"]["address"]
+    assert address_fp["tp"] == 0
+    assert address_fp["fp"] == 1
+    assert address_fp["fn"] == 0
+    assert address_fp["precision"] == 0.0
+    assert address_fp["recall"] == 0.0
+    assert address_fp["f1"] == 0.0
+    assert metrics_fp["strict"]["micro_overall"]["fp"] == 1
+
+
+def test_phone_normalization_strict_matches_existing():
+    # Strict mode retains existing behavior
+    assert common.normalize_value("phone", "+1 (202) 555-0100", phone_mode="strict") == "+12025550100"
+    assert common.normalize_value("phone", "+91 98765 43210", phone_mode="strict") == "+919876543210"
+    assert common.normalize_value("phone", "91 98765 43210", phone_mode="strict") == "919876543210"
+    assert common.normalize_value("phone", "098765 43210", phone_mode="strict") == "09876543210"
+    assert common.normalize_value("phone", "98765 43210", phone_mode="strict") == "9876543210"
+
+    # Default call without phone_mode must match strict
+    assert common.normalize_value("phone", "098765 43210") == "09876543210"
+
+
+def test_phone_normalization_india_national_equivalent_forms():
+    expected_canonical = "+919876543210"
+    equivalent_inputs = [
+        "+91 98765 43210",
+        "91 98765 43210",
+        "098765 43210",
+        "98765 43210",
+        "+91 (0) 98765 43210",
+    ]
+    for raw in equivalent_inputs:
+        assert common.normalize_value("phone", raw, phone_mode="india_national") == expected_canonical
+
+
+def test_phone_normalization_unsupported_and_ambiguous():
+    # Non-Indian 10-digit number not starting with 6, 7, 8, or 9
+    assert common.normalize_value("phone", "202 555 0100", phone_mode="india_national") == "2025550100"
+    # Invalid length (9 digits)
+    assert common.normalize_value("phone", "987654321", phone_mode="india_national") == "987654321"
+    # Invalid length (11 digits starting with 9)
+    assert common.normalize_value("phone", "98765432100", phone_mode="india_national") == "98765432100"
+    # Short string
+    assert common.normalize_value("phone", "12345", phone_mode="india_national") == "12345"
+    # International numbers from other countries
+    assert common.normalize_value("phone", "+1 202 555 0100", phone_mode="india_national") == "+12025550100"
+    assert common.normalize_value("phone", "+44 20 7946 0919", phone_mode="india_national") == "+442079460919"
+
+    # Unknown mode raises ValueError
+    with pytest.raises(ValueError, match="unknown phone normalization mode"):
+        common.normalize_value("phone", "9876543210", phone_mode="unsupported")
+
+
+@pytest.mark.parametrize(
+    "pred_value",
+    [
+        "+91 98765 43210",
+        "91 98765 43210",
+        "098765 43210",
+        "98765 43210",
+        "+91 (0) 98765 43210",
+    ],
+)
+def test_phone_scoring_india_national_mode(pred_value):
+    gt = _entity(category="phone", value="+91 98765 43210", box=(0, 0, 100, 40))
+    pred = _prediction(category="phone", value=pred_value, box=(0, 0, 100, 40))
+    annotation = _annotation(entities=(gt,))
+
+    metrics_india = common.score_results((annotation,), _run((pred,)), phone_mode="india_national")
+    assert metrics_india["strict"]["per_category"]["phone"]["tp"] == 1
+    assert metrics_india["strict"]["per_category"]["phone"]["fp"] == 0
+    assert metrics_india["strict"]["per_category"]["phone"]["fn"] == 0
+
+
+def test_phone_scoring_strict_mode_mismatch():
+    gt = _entity(category="phone", value="+91 98765 43210", box=(0, 0, 100, 40))
+    pred = _prediction(category="phone", value="098765 43210", box=(0, 0, 100, 40))
+    annotation = _annotation(entities=(gt,))
+
+    metrics_strict = common.score_results((annotation,), _run((pred,)), phone_mode="strict")
+    assert metrics_strict["strict"]["per_category"]["phone"]["tp"] == 0
+    assert metrics_strict["strict"]["per_category"]["phone"]["fp"] == 1
+    assert metrics_strict["strict"]["per_category"]["phone"]["fn"] == 1
+
+
+def test_annotation_loading_optional_template_and_condition(tmp_path):
+    # Record without template_id
+    path = tmp_path / "no_template.jsonl"
+    record1 = {
+        "annotation_version": common.ANNOTATION_VERSION,
+        "image_id": "test-01",
+        "split": "development",
+        "image_file": "images/development/test-01.png",
+        "image_size": {"width": 100, "height": 60},
+        "entities": [],
+    }
+    path.write_text(json.dumps(record1) + "\n", encoding="utf-8")
+    loaded1 = common.load_annotations(path)[0]
+    assert loaded1.template_id is None
+    assert loaded1.condition is None
+
+    # Record with generation.condition
+    path2 = tmp_path / "with_condition.jsonl"
+    record2 = {
+        "annotation_version": common.ANNOTATION_VERSION,
+        "image_id": "test-02",
+        "split": "development",
+        "image_file": "images/development/test-02.png",
+        "image_size": {"width": 100, "height": 60},
+        "template_id": "custom-template-01",
+        "generation": {
+            "condition": {
+                "resolution": [1024, 768],
+                "blur": 0.5,
+                "jpeg_quality": 85,
+                "rotation": 0,
+            }
+        },
+        "entities": [],
+    }
+    path2.write_text(json.dumps(record2) + "\n", encoding="utf-8")
+    loaded2 = common.load_annotations(path2)[0]
+    assert loaded2.template_id == "custom-template-01"
+    assert loaded2.condition == {
+        "resolution": [1024, 768],
+        "blur": 0.5,
+        "jpeg_quality": 85,
+        "rotation": 0,
+    }
+
+
+def test_grouped_reporting_by_template_and_condition():
+    ann1 = common.ImageAnnotation(
+        image_id="img-1",
+        split="development",
+        image_file="images/development/img-1.png",
+        width=100,
+        height=60,
+        template_id="layout-A",
+        entities=(_entity(category="phone", value="+1 202-555-0100"),),
+        condition={"resolution": [1024, 768], "blur": 0.0, "jpeg_quality": 95, "rotation": 0},
+    )
+    ann2 = common.ImageAnnotation(
+        image_id="img-2",
+        split="development",
+        image_file="images/development/img-2.png",
+        width=100,
+        height=60,
+        template_id="layout-B",
+        entities=(_entity(category="phone", value="+1 202-555-0100"),),
+        condition={"resolution": [1280, 960], "blur": 1.0, "jpeg_quality": 80, "rotation": 90},
+    )
+    runs = {
+        "img-1": {"status": "ok", "predictions": (_prediction(value="+1 202 555 0100"),)},
+        "img-2": {"status": "ok", "predictions": ()},
+    }
+
+    metrics = common.score_results((ann1, ann2), runs)
+
+    # by_template_id check
+    assert "layout-A" in metrics["by_template_id"]
+    assert "layout-B" in metrics["by_template_id"]
+    assert metrics["by_template_id"]["layout-A"]["strict"]["micro_overall"]["tp"] == 1
+    assert metrics["by_template_id"]["layout-B"]["strict"]["micro_overall"]["fn"] == 1
+
+    # by_condition dimensions check
+    by_cond = metrics["by_condition"]
+    assert "0.0" in by_cond["blur"]
+    assert "1.0" in by_cond["blur"]
+    assert by_cond["blur"]["0.0"]["strict"]["micro_overall"]["tp"] == 1
+    assert by_cond["blur"]["1.0"]["strict"]["micro_overall"]["fn"] == 1
+    assert "1024x768" in by_cond["resolution"]
+    assert "1280x960" in by_cond["resolution"]
+    assert "95" in by_cond["jpeg_quality"]
+    assert "80" in by_cond["jpeg_quality"]
+    assert "0" in by_cond["rotation"]
+    assert "90" in by_cond["rotation"]
+
+    # by_object composite check
+    assert len(by_cond["by_object"]) == 2
+
+    # Graceful handling when condition is absent
+    ann_empty = _annotation("img-empty", entities=())
+    metrics_empty = common.score_results((ann_empty,), {"img-empty": {"status": "ok", "predictions": ()}})
+    assert metrics_empty["by_condition"]["blur"] == {}
+    assert metrics_empty["by_condition"]["by_object"] == {}
+
+
+def test_cli_phone_mode_option_and_reporting(monkeypatch, tmp_path):
+    captured_report = {}
+
+    def fake_run(**kwargs):
+        captured_report.update(kwargs)
+        return {
+            "run_status": "completed",
+            "phone_mode": kwargs.get("phone_mode", "strict"),
+            "metrics": {
+                "image_count": 0,
+                "strict": {"micro_overall": {"f1": 1.0}},
+                "status_counts": {"partial": 0, "error": 0},
+            },
+        }
+
+    monkeypatch.setattr(evaluate, "run", fake_run)
+    results_dir = tmp_path / "results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(evaluate, "BENCHMARK_ROOT", tmp_path)
+    output_path = results_dir / "test-cli-report.json"
+
+    # Default CLI call must have phone_mode="strict"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evaluate.py",
+            "--code-revision", "test-rev",
+            "--split", "development",
+            "--output", str(output_path),
+        ],
+    )
+    assert evaluate.main() == 0
+    assert captured_report["phone_mode"] == "strict"
+
+    # Explicit --phone-mode india_national
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evaluate.py",
+            "--code-revision", "test-rev",
+            "--split", "development",
+            "--phone-mode", "india_national",
+            "--output", str(output_path),
+        ],
+    )
+    assert evaluate.main() == 0
+    assert captured_report["phone_mode"] == "india_national"

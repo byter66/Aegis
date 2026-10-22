@@ -230,6 +230,8 @@ def evaluate_split(
     annotations: tuple[ImageAnnotation, ...],
     ocr: _CountingOCR,
     ner: SpacyNERAdapter,
+    *,
+    phone_mode: str = "strict",
 ) -> tuple[dict[str, dict[str, object]], dict[str, object]]:
     runs: dict[str, dict[str, object]] = {}
     for annotation in annotations:
@@ -265,13 +267,16 @@ def evaluate_split(
             "predictions": predictions,
             "errors": errors,
         }
-    metrics = score_results(annotations, runs)
+    metrics = score_results(annotations, runs, phone_mode=phone_mode)
     _add_email_mismatch_category_summaries(metrics, annotations, runs)
     return runs, metrics
 
 
 def _sanitize_failed_initialization(
-    annotations: tuple[ImageAnnotation, ...], exception: BaseException
+    annotations: tuple[ImageAnnotation, ...],
+    exception: BaseException,
+    *,
+    phone_mode: str = "strict",
 ) -> dict[str, object]:
     error_type = type(exception).__name__
     runs = {
@@ -284,7 +289,7 @@ def _sanitize_failed_initialization(
         }
         for annotation in annotations
     }
-    metrics = score_results(annotations, runs)
+    metrics = score_results(annotations, runs, phone_mode=phone_mode)
     _add_email_mismatch_category_summaries(metrics, annotations, runs)
     return {
         "run_status": "initialization_error",
@@ -300,6 +305,7 @@ def run(
     code_revision: str,
     tile_size: int,
     tile_overlap: int,
+    phone_mode: str = "strict",
 ) -> dict[str, object]:
     annotations = _load_split(split)
     _validate_image_files(annotations)
@@ -310,6 +316,7 @@ def run(
         "benchmark_version": "aegis-ocr-pii-benchmark-v1",
         "split": split,
         "code_revision": code_revision,
+        "phone_mode": phone_mode,
         "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
         "image_count": len(annotations),
         "tile_configuration": {
@@ -325,7 +332,7 @@ def run(
             tile_size, tile_overlap
         )
     except Exception as exception:
-        base.update(_sanitize_failed_initialization(annotations, exception))
+        base.update(_sanitize_failed_initialization(annotations, exception, phone_mode=phone_mode))
         base["cold_initialization_ms"] = {
             "initialization_failed_after_ms": round(
                 (time.perf_counter() - initialization_started) * 1000, 3
@@ -334,7 +341,7 @@ def run(
         base["versions"] = _versions()
         return base
 
-    runs, metrics = evaluate_split(annotations, ocr, ner)
+    runs, metrics = evaluate_split(annotations, ocr, ner, phone_mode=phone_mode)
     base.update(
         {
             "run_status": "completed",
@@ -352,6 +359,12 @@ def main() -> int:
     parser.add_argument("--code-revision", required=True, help="recorded source revision; supplied explicitly without running Git")
     parser.add_argument("--tile-size", type=int, default=1600)
     parser.add_argument("--tile-overlap", type=int, default=128)
+    parser.add_argument(
+        "--phone-mode",
+        choices=("strict", "india_national"),
+        default="strict",
+        help="phone number normalization mode: strict (default) or india_national",
+    )
     parser.add_argument("--output", type=Path, help="optional output JSON path inside benchmark/results")
     arguments = parser.parse_args()
     if arguments.tile_size <= 0 or arguments.tile_overlap < 0 or arguments.tile_overlap >= arguments.tile_size:
@@ -361,6 +374,7 @@ def main() -> int:
         code_revision=arguments.code_revision,
         tile_size=arguments.tile_size,
         tile_overlap=arguments.tile_overlap,
+        phone_mode=arguments.phone_mode,
     )
     results_directory = BENCHMARK_ROOT / "results"
     results_directory.mkdir(exist_ok=True)
