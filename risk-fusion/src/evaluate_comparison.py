@@ -1,6 +1,7 @@
 """Direct comparison between Rule-Based Baseline and Learned ML Fusion.
 Generates the comparison metrics table for the project report.
 """
+import os
 import pandas as pd
 import joblib
 from sklearn.model_selection import train_test_split
@@ -10,12 +11,18 @@ from baseline import rule_based_risk
 
 def run_comparison():
     # 1. Load the dataset
-    df = pd.read_csv("risk-fusion/risk_dataset.csv")
+    dataset_path = "risk-fusion/risk_dataset.csv"
+    if not os.path.exists(dataset_path):
+        dataset_path = "risk_dataset.csv"
+    df = pd.read_csv(dataset_path)
 
     feature_cols = [
         "ocr_pii_flag", "num_pii_types", "has_address", 
         "has_phone", "landmark_flag", "landmark_confidence"
     ]
+    if "scene_score" in df.columns:
+        feature_cols.append("scene_score")
+
     X = df[feature_cols]
     y = df["risk_label"]
 
@@ -45,7 +52,12 @@ def run_comparison():
     # ---------------------------------------------------------
     # Evaluation 2: Learned ML Model Predictions on Test Set
     # ---------------------------------------------------------
-    ml_model = joblib.load("risk-fusion/fusion_model.joblib")
+    model_path = "risk-fusion/fusion_model.joblib"
+    if not os.path.exists(model_path):
+        model_path = "fusion_model.joblib"
+    ml_model = joblib.load(model_path)
+    if isinstance(ml_model, dict) and "model" in ml_model:
+        ml_model = ml_model["model"]
     ml_preds = ml_model.predict(X_test)
 
     # Calculate metrics

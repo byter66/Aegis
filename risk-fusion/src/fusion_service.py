@@ -157,6 +157,11 @@ class AegisRiskFusion:
             scene_boost = int(round(scene_score * 15))
             continuous_score = min(continuous_score + scene_boost, 59)
 
+        # Landmark safety net: A detected landmark (confidence >= 0.50) must be at least Medium
+        if landmark_flag and landmark_conf >= 0.50 and risk_level == "Low":
+            risk_level = "Medium"
+            continuous_score = min(max(continuous_score, 45), 59)
+
         # 7. Generate explainable reasons for the user
         reasons = []
         if has_address:

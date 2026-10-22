@@ -4,5 +4,6 @@
   "has_address",
   "has_phone",
   "landmark_flag",
-  "landmark_confidence"
+  "landmark_confidence",
+  "scene_score"
 ]
