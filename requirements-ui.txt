@@ -1,0 +1,10 @@
+# Frontend (Streamlit) — enough to run app.py in demo mode
+streamlit>=1.50
+pillow>=10.1
+pandas
+joblib
+scikit-learn==1.9.0   # must match the version fusion_model.joblib was saved with
+
+# For real mode, also install each module's own requirements:
+#   pip install -e ./ocr-pii-ner   (+ the en_core_web_sm spaCy model, see ocr-pii-ner/README.md)
+#   pip install -r landmark_module/requirements.txt
