@@ -8,7 +8,13 @@ from unittest.mock import Mock, patch
 from PIL import Image, ImageDraw
 import pytest
 
-from aegis_ocr.ocr import EasyOCREngine, OCRResult, OCRSegment, _tile_starts
+from aegis_ocr.ocr import (
+    EasyOCREngine,
+    OCRResult,
+    OCRSegment,
+    _tile_starts,
+    _to_segment,
+)
 from aegis_ocr.schema import (
     Finding,
     FindingCategory,
@@ -534,3 +540,25 @@ def test_ocr_result_rejects_unsupported_collection_types(field: str) -> None:
     kwargs = {field: None}
     with pytest.raises(TypeError, match=f"{field} must be a list or tuple"):
         OCRResult(PipelineStatus.OK, **kwargs)  # type: ignore[arg-type]
+
+
+def test_to_segment_clamps_negative_coordinates_to_zero() -> None:
+    raw_polygon = [
+        (-4.5, 12.0),
+        (25.0, -1.5),
+        (30.0, 40.0),
+        (-0.5, -0.2),
+    ]
+    raw = (raw_polygon, "synthetic coordinate sample", 0.95)
+
+    segment = _to_segment(raw)
+
+    expected_polygon = (
+        (0.0, 12.0),
+        (25.0, 0.0),
+        (30.0, 40.0),
+        (0.0, 0.0),
+    )
+    assert segment.image_region.polygon == expected_polygon
+    assert segment.text == "synthetic coordinate sample"
+    assert segment.ocr_confidence == 0.95

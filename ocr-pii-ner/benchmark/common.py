@@ -12,7 +12,8 @@ from typing import Sequence
 
 
 ANNOTATION_VERSION = "aegis-ocr-pii-benchmark-v1"
-CATEGORIES = ("person_name", "email", "phone")
+CATEGORIES = ("person_name", "email", "phone", "address")
+CONDITION_DIMENSIONS = ("resolution", "blur", "jpeg_quality", "rotation")
 IOU_THRESHOLD = 0.5
 EMAIL_MISMATCH_CATEGORIES = (
     "exact_match",
@@ -46,8 +47,9 @@ class ImageAnnotation:
     image_file: str
     width: int
     height: int
-    template_id: str
+    template_id: str | None
     entities: tuple[EntityAnnotation, ...]
+    condition: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -57,16 +59,47 @@ class Prediction:
     bbox_xyxy: Box | None
 
 
-def normalize_value(category: str, value: str) -> str:
-    """Normalize only formatting that should not change synthetic identity."""
+def normalize_value(
+    category: str,
+    value: str,
+    *,
+    phone_mode: str = "strict",
+) -> str:
+    """Normalize only formatting that should not change synthetic identity.
+
+    For 'phone', phone_mode='strict' (default) preserves ASCII digits and a
+    leading '+' if the trimmed input begins with '+'. Under
+    phone_mode='india_national', unambiguous representations of 10-digit Indian
+    mobile numbers (starting with 6, 7, 8, or 9) in +91, 91, 0, or bare 10-digit
+    forms normalize to '+91' followed by the 10 subscriber digits. Unsupported
+    or ambiguous digit strings retain strict normalization.
+
+    For 'address', Unicode NFKC normalization, trimming, case-folding, and
+    collapsing consecutive whitespace to a single space are applied.
+    """
+
+    if phone_mode not in ("strict", "india_national"):
+        raise ValueError(f"unknown phone normalization mode: {phone_mode!r}")
 
     normalized = unicodedata.normalize("NFKC", value).strip()
     if category == "person_name":
         return " ".join(normalized.casefold().split())
     if category == "email":
         return normalized.casefold()
+    if category == "address":
+        return " ".join(normalized.casefold().split())
     if category == "phone":
         digits = "".join(character for character in normalized if "0" <= character <= "9")
+        if phone_mode == "india_national":
+            # 10-digit Indian mobile numbers start with 6, 7, 8, or 9.
+            if len(digits) == 10 and digits[0] in "6789":
+                return "+91" + digits
+            if len(digits) == 11 and digits.startswith("0") and digits[1] in "6789":
+                return "+91" + digits[1:]
+            if len(digits) == 12 and digits.startswith("91") and digits[2] in "6789":
+                return "+91" + digits[2:]
+            if len(digits) == 13 and digits.startswith("910") and digits[3] in "6789":
+                return "+91" + digits[3:]
         return ("+" if normalized.startswith("+") else "") + digits
     raise ValueError("unknown finding category")
 
@@ -258,7 +291,9 @@ def load_annotations(
             image_file = raw["image_file"]
             dimensions = raw["image_size"]
             width, height = dimensions["width"], dimensions["height"]
-            template_id = raw["template_id"]
+            template_id = raw.get("template_id")
+            if template_id is not None and (not isinstance(template_id, str) or not template_id):
+                raise ValueError
             entity_rows = raw["entities"]
             if (
                 not isinstance(image_id, str)
@@ -275,11 +310,19 @@ def load_annotations(
                 or not isinstance(height, int)
                 or isinstance(height, bool)
                 or height <= 0
-                or not isinstance(template_id, str)
-                or not template_id
                 or not isinstance(entity_rows, list)
             ):
                 raise ValueError
+            generation = raw.get("generation")
+            condition: dict[str, object] | None = None
+            if generation is not None:
+                if not isinstance(generation, dict):
+                    raise ValueError
+                raw_condition = generation.get("condition")
+                if raw_condition is not None:
+                    if not isinstance(raw_condition, dict):
+                        raise ValueError
+                    condition = raw_condition
             entities: list[EntityAnnotation] = []
             for entity in entity_rows:
                 if not isinstance(entity, dict):
@@ -320,6 +363,7 @@ def load_annotations(
                     height,
                     template_id,
                     tuple(entities),
+                    condition,
                 )
             )
             seen_ids.add(image_id)
@@ -334,6 +378,7 @@ def _maximum_matching(
     *,
     threshold: float,
     require_value: bool,
+    phone_mode: str = "strict",
 ) -> tuple[tuple[int, int], ...]:
     """Deterministic maximum-cardinality bipartite matching (prediction, GT)."""
 
@@ -346,8 +391,10 @@ def _maximum_matching(
             if box_iou(prediction.bbox_xyxy, expected.bbox_xyxy) < threshold:
                 continue
             if require_value and normalize_value(
-                prediction.category, prediction.value
-            ) != expected.normalized_value:
+                prediction.category, prediction.value, phone_mode=phone_mode
+            ) != normalize_value(
+                expected.category, expected.expected_value, phone_mode=phone_mode
+            ):
                 continue
             candidates.append(index)
         edges.append(candidates)
@@ -370,11 +417,102 @@ def _maximum_matching(
     return tuple(sorted((prediction_index, gt_index) for gt_index, prediction_index in matched_gt.items()))
 
 
-def _metric_counts(tp: int, fp: int, fn: int) -> dict[str, float | int]:
+def _metric_counts(tp: int, fp: int, fn: int) -> dict[str, float | int | None]:
+    if tp == 0 and fp == 0 and fn == 0:
+        return {"tp": 0, "fp": 0, "fn": 0, "precision": None, "recall": None, "f1": None}
     precision = tp / (tp + fp) if tp + fp else 0.0
     recall = tp / (tp + fn) if tp + fn else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
     return {"tp": tp, "fp": fp, "fn": fn, "precision": precision, "recall": recall, "f1": f1}
+
+
+def _score_slice(
+    annotations: Sequence[ImageAnnotation],
+    image_runs: dict[str, dict[str, object]],
+    *,
+    iou_threshold: float,
+    phone_mode: str,
+) -> dict[str, object]:
+    """Score a subset slice of image annotations using the given criteria."""
+
+    categories: dict[str, dict[str, int]] = {
+        category: {"tp": 0, "fp": 0, "fn": 0} for category in CATEGORIES
+    }
+    localization: dict[str, dict[str, int]] = {
+        category: {"tp": 0, "fp": 0, "fn": 0} for category in CATEGORIES
+    }
+    strict_total = {"tp": 0, "fp": 0, "fn": 0}
+    localization_total = {"tp": 0, "fp": 0, "fn": 0}
+    status_counts = {"ok": 0, "partial": 0, "error": 0}
+
+    for annotation in annotations:
+        run = image_runs.get(annotation.image_id, {})
+        status = str(run.get("status", "error"))
+        if status not in status_counts:
+            status = "error"
+        status_counts[status] += 1
+        raw_predictions = run.get("predictions", ()) if status != "error" else ()
+        predictions = tuple(
+            item if isinstance(item, Prediction) else Prediction(**item)
+            for item in raw_predictions
+        )
+        for category in CATEGORIES:
+            expected = tuple(entity for entity in annotation.entities if entity.category == category)
+            predicted = tuple(prediction for prediction in predictions if prediction.category == category)
+            strict_pairs_indices = _maximum_matching(
+                expected, predicted, threshold=iou_threshold, require_value=True, phone_mode=phone_mode
+            )
+            localized_pairs_indices = _maximum_matching(
+                expected, predicted, threshold=iou_threshold, require_value=False, phone_mode=phone_mode
+            )
+            tp = len(strict_pairs_indices)
+            fp = len(predicted) - tp
+            fn = len(expected) - tp
+            categories[category]["tp"] += tp
+            categories[category]["fp"] += fp
+            categories[category]["fn"] += fn
+            strict_total["tp"] += tp
+            strict_total["fp"] += fp
+            strict_total["fn"] += fn
+
+            loc_tp = len(localized_pairs_indices)
+            localization[category]["tp"] += loc_tp
+            localization[category]["fp"] += len(predicted) - loc_tp
+            localization[category]["fn"] += len(expected) - loc_tp
+            localization_total["tp"] += loc_tp
+            localization_total["fp"] += len(predicted) - loc_tp
+            localization_total["fn"] += len(expected) - loc_tp
+
+    strict_by_category = {
+        category: _metric_counts(**counts) for category, counts in categories.items()
+    }
+    localization_by_category = {
+        category: _metric_counts(**counts) for category, counts in localization.items()
+    }
+    labeled_categories = [
+        category for category in CATEGORIES
+        if categories[category]["tp"] + categories[category]["fn"] > 0
+    ]
+    macro_f1 = (
+        sum(strict_by_category[category]["f1"] for category in labeled_categories)
+        / len(labeled_categories)
+        if labeled_categories
+        else 0.0
+    )
+
+    return {
+        "image_count": len(annotations),
+        "strict": {
+            "per_category": strict_by_category,
+            "micro_overall": _metric_counts(**strict_total),
+            "macro_f1": macro_f1,
+        },
+        "localization_only": {
+            "per_category": localization_by_category,
+            "micro_overall": _metric_counts(**localization_total),
+        },
+        "status_counts": status_counts,
+    }
 
 
 def score_results(
@@ -382,8 +520,16 @@ def score_results(
     image_runs: dict[str, dict[str, object]],
     *,
     iou_threshold: float = IOU_THRESHOLD,
+    phone_mode: str = "strict",
 ) -> dict[str, object]:
-    """Score strict entities and localization while retaining sanitized run data."""
+    """Score strict entities and localization while retaining sanitized run data.
+
+    Macro F1 is computed as the arithmetic mean of F1 scores over categories
+    that have at least one labelled entity in the evaluated annotations
+    (tp + fn > 0). Categories with zero labels in the evaluated split are
+    excluded from the macro F1 average so they do not distort the score.
+    If no category has any labelled entities, macro F1 is 0.0.
+    """
 
     categories: dict[str, dict[str, int]] = {
         category: {"tp": 0, "fp": 0, "fn": 0} for category in CATEGORIES
@@ -421,10 +567,10 @@ def score_results(
             expected = tuple(entity for entity in annotation.entities if entity.category == category)
             predicted = tuple(prediction for prediction in predictions if prediction.category == category)
             strict_pairs_indices = _maximum_matching(
-                expected, predicted, threshold=iou_threshold, require_value=True
+                expected, predicted, threshold=iou_threshold, require_value=True, phone_mode=phone_mode
             )
             localized_pairs_indices = _maximum_matching(
-                expected, predicted, threshold=iou_threshold, require_value=False
+                expected, predicted, threshold=iou_threshold, require_value=False, phone_mode=phone_mode
             )
             tp = len(strict_pairs_indices)
             fp = len(predicted) - tp
@@ -446,7 +592,11 @@ def score_results(
             localization_total["fn"] += len(expected) - loc_tp
             for pred_index, gt_index in localized_pairs_indices:
                 localized_total += 1
-                if normalize_value(category, predicted[pred_index].value) == expected[gt_index].normalized_value:
+                if normalize_value(
+                    category, predicted[pred_index].value, phone_mode=phone_mode
+                ) == normalize_value(
+                    category, expected[gt_index].expected_value, phone_mode=phone_mode
+                ):
                     localized_value_exact += 1
                 else:
                     transcription_mismatches += 1
@@ -488,12 +638,77 @@ def score_results(
     localization_by_category = {
         category: _metric_counts(**counts) for category, counts in localization.items()
     }
+    labeled_categories = [
+        category for category in CATEGORIES
+        if categories[category]["tp"] + categories[category]["fn"] > 0
+    ]
+    macro_f1 = (
+        sum(strict_by_category[category]["f1"] for category in labeled_categories)
+        / len(labeled_categories)
+        if labeled_categories
+        else 0.0
+    )
+
+    by_template_id: dict[str, object] = {}
+    templates: dict[str, list[ImageAnnotation]] = {}
+    for annotation in annotations:
+        if annotation.template_id is not None:
+            templates.setdefault(annotation.template_id, []).append(annotation)
+    for template_key in sorted(templates):
+        by_template_id[template_key] = _score_slice(
+            templates[template_key],
+            image_runs,
+            iou_threshold=iou_threshold,
+            phone_mode=phone_mode,
+        )
+
+    by_condition: dict[str, object] = {
+        dimension: {} for dimension in CONDITION_DIMENSIONS
+    }
+    by_condition["by_object"] = {}
+
+    dimension_groups: dict[str, dict[str, list[ImageAnnotation]]] = {
+        dimension: {} for dimension in CONDITION_DIMENSIONS
+    }
+    object_groups: dict[str, list[ImageAnnotation]] = {}
+
+    for annotation in annotations:
+        if annotation.condition and isinstance(annotation.condition, dict):
+            for dimension in CONDITION_DIMENSIONS:
+                if dimension in annotation.condition:
+                    val = annotation.condition[dimension]
+                    if isinstance(val, (list, tuple)):
+                        val_str = "x".join(str(item) for item in val)
+                    else:
+                        val_str = str(val)
+                    dimension_groups[dimension].setdefault(val_str, []).append(annotation)
+
+            composite_key = json.dumps(annotation.condition, sort_keys=True)
+            object_groups.setdefault(composite_key, []).append(annotation)
+
+    for dimension in CONDITION_DIMENSIONS:
+        for val_key in sorted(dimension_groups[dimension]):
+            by_condition[dimension][val_key] = _score_slice(
+                dimension_groups[dimension][val_key],
+                image_runs,
+                iou_threshold=iou_threshold,
+                phone_mode=phone_mode,
+            )
+
+    for obj_key in sorted(object_groups):
+        by_condition["by_object"][obj_key] = _score_slice(
+            object_groups[obj_key],
+            image_runs,
+            iou_threshold=iou_threshold,
+            phone_mode=phone_mode,
+        )
+
     return {
         "image_count": len(annotations),
         "strict": {
             "per_category": strict_by_category,
             "micro_overall": _metric_counts(**strict_total),
-            "macro_f1": sum(item["f1"] for item in strict_by_category.values()) / len(CATEGORIES),
+            "macro_f1": macro_f1,
         },
         "localization_only": {
             "per_category": localization_by_category,
@@ -513,6 +728,8 @@ def score_results(
         "partial_rate": status_counts["partial"] / len(annotations) if annotations else 0.0,
         "error_rate": status_counts["error"] / len(annotations) if annotations else 0.0,
         "per_image": image_summaries,
+        "by_template_id": by_template_id,
+        "by_condition": by_condition,
     }
 
 

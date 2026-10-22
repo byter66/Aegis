@@ -399,6 +399,9 @@ def _to_segment(raw: object) -> OCRSegment:
         if not isinstance(point, (tuple, list)) or len(point) != 2:
             raise ValueError("OCR result has an invalid polygon point")
         x, y = float(point[0]), float(point[1])
+        if not math.isfinite(x) or not math.isfinite(y):
+            raise ValueError("OCR polygon coordinates must be finite")
+        x, y = max(0.0, x), max(0.0, y)
         polygon.append((x, y))
     if not isinstance(raw_text, str):
         raise ValueError("OCR result text must be a string")
