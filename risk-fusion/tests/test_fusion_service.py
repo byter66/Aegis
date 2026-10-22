@@ -88,6 +88,23 @@ class TestAegisRiskFusionService(unittest.TestCase):
         res = self.fusion.evaluate_image(flat)
         self.assertIn(res["risk_level"], ["Medium", "High"])
 
+    def test_landmark_positive_detection(self):
+        """A high-confidence landmark detection must be included in explainable reasons."""
+        payload = {
+            "ocr_ner": {"status": "OK", "findings": [], "error": None},
+            "landmark": {
+                "status": "OK",
+                "detected": True,
+                "name": "Taj Mahal",
+                "confidence": 0.88,
+                "error": None
+            }
+        }
+        res = self.fusion.evaluate_image(payload)
+        reasons_text = " ".join(res["reasons"])
+        self.assertIn("Taj Mahal", reasons_text)
+        self.assertIn(res["risk_level"], ["Medium", "High"])
+
 
 if __name__ == "__main__":
     unittest.main()
