@@ -16,7 +16,7 @@ places = [
     "Chinese fishing nets in Fort Kochi", "Fort Kochi", "Vagamon",
     "IIIT Kottayam", "Pala","Burj Khalifa", "Burj Al Arab", "Eiffel Tower", "Big Ben", "Tower Bridge",
     "Statue of Liberty", "Sydney Opera House", "Colosseum", "Golden Gate Bridge",
-    "Petronas Towers", "Marina Bay Sands", "Kochi International Airport", "Kottayam Railway Station"
+    "Petronas Towers", "Kochi International Airport", "Kottayam Railway Station"
 ]
 
 negatives = [
