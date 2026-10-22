@@ -1,0 +1,26 @@
+{
+  "dataset_version": "aegis-ocr-pii-benchmark-v1",
+  "font_sha256_by_file": {
+    "arial.ttf": "b3658eadae55e682b5f69eb64c439c1ecc8f196c0bb8d4756d145d13bc86476a",
+    "calibri.ttf": "57e93ff143572bcc092c1f56202d43ddc07bb119aa104c6d7af163470fb551f6",
+    "segoeui.ttf": "704eada12961a27fd271f7d3b09e2066520e758390c1776744eff430fee30f6e",
+    "times.ttf": "931c5de5c70401d9324d5014c123802b4fb753000360ceb2f56c589403cd58c5"
+  },
+  "generation_seed_policy": "fixed per split and image index",
+  "split_entity_counts": {
+    "development": {
+      "email": 10,
+      "person_name": 10,
+      "phone": 10
+    },
+    "heldout": {
+      "email": 4,
+      "person_name": 4,
+      "phone": 4
+    }
+  },
+  "split_image_counts": {
+    "development": 28,
+    "heldout": 12
+  }
+}

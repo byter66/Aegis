@@ -1,0 +1,1695 @@
+{
+  "benchmark_version": "aegis-ocr-pii-benchmark-v1",
+  "code_revision": "68df7e9b61db2122be158b35ab1574a4d7a6ab76",
+  "cold_initialization_ms": {
+    "easyocr_reader_ms": 2904.335,
+    "spacy_model_ms": 1186.477
+  },
+  "image_count": 28,
+  "metrics": {
+    "by_condition": {
+      "blur": {},
+      "by_object": {},
+      "jpeg_quality": {},
+      "resolution": {},
+      "rotation": {}
+    },
+    "by_template_id": {
+      "development-layout-01": {
+        "image_count": 5,
+        "localization_only": {
+          "micro_overall": {
+            "f1": 0.8,
+            "fn": 2,
+            "fp": 0,
+            "precision": 1.0,
+            "recall": 0.6666666666666666,
+            "tp": 4
+          },
+          "per_category": {
+            "address": {
+              "f1": null,
+              "fn": 0,
+              "fp": 0,
+              "precision": null,
+              "recall": null,
+              "tp": 0
+            },
+            "email": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            },
+            "person_name": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            },
+            "phone": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 2
+            }
+          }
+        },
+        "status_counts": {
+          "error": 0,
+          "ok": 5,
+          "partial": 0
+        },
+        "strict": {
+          "macro_f1": 0.7777777777777777,
+          "micro_overall": {
+            "f1": 0.8,
+            "fn": 2,
+            "fp": 0,
+            "precision": 1.0,
+            "recall": 0.6666666666666666,
+            "tp": 4
+          },
+          "per_category": {
+            "address": {
+              "f1": null,
+              "fn": 0,
+              "fp": 0,
+              "precision": null,
+              "recall": null,
+              "tp": 0
+            },
+            "email": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            },
+            "person_name": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            },
+            "phone": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 2
+            }
+          }
+        }
+      },
+      "development-layout-02": {
+        "image_count": 5,
+        "localization_only": {
+          "micro_overall": {
+            "f1": 0.8,
+            "fn": 2,
+            "fp": 0,
+            "precision": 1.0,
+            "recall": 0.6666666666666666,
+            "tp": 4
+          },
+          "per_category": {
+            "address": {
+              "f1": null,
+              "fn": 0,
+              "fp": 0,
+              "precision": null,
+              "recall": null,
+              "tp": 0
+            },
+            "email": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            },
+            "person_name": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            },
+            "phone": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 2
+            }
+          }
+        },
+        "status_counts": {
+          "error": 0,
+          "ok": 5,
+          "partial": 0
+        },
+        "strict": {
+          "macro_f1": 0.7777777777777777,
+          "micro_overall": {
+            "f1": 0.8,
+            "fn": 2,
+            "fp": 0,
+            "precision": 1.0,
+            "recall": 0.6666666666666666,
+            "tp": 4
+          },
+          "per_category": {
+            "address": {
+              "f1": null,
+              "fn": 0,
+              "fp": 0,
+              "precision": null,
+              "recall": null,
+              "tp": 0
+            },
+            "email": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            },
+            "person_name": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            },
+            "phone": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 2
+            }
+          }
+        }
+      },
+      "development-layout-03": {
+        "image_count": 5,
+        "localization_only": {
+          "micro_overall": {
+            "f1": 0.8,
+            "fn": 2,
+            "fp": 0,
+            "precision": 1.0,
+            "recall": 0.6666666666666666,
+            "tp": 4
+          },
+          "per_category": {
+            "address": {
+              "f1": null,
+              "fn": 0,
+              "fp": 0,
+              "precision": null,
+              "recall": null,
+              "tp": 0
+            },
+            "email": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 2
+            },
+            "person_name": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            },
+            "phone": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            }
+          }
+        },
+        "status_counts": {
+          "error": 0,
+          "ok": 5,
+          "partial": 0
+        },
+        "strict": {
+          "macro_f1": 0.4444444444444444,
+          "micro_overall": {
+            "f1": 0.4,
+            "fn": 4,
+            "fp": 2,
+            "precision": 0.5,
+            "recall": 0.3333333333333333,
+            "tp": 2
+          },
+          "per_category": {
+            "address": {
+              "f1": null,
+              "fn": 0,
+              "fp": 0,
+              "precision": null,
+              "recall": null,
+              "tp": 0
+            },
+            "email": {
+              "f1": 0.0,
+              "fn": 2,
+              "fp": 2,
+              "precision": 0.0,
+              "recall": 0.0,
+              "tp": 0
+            },
+            "person_name": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            },
+            "phone": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            }
+          }
+        }
+      },
+      "development-layout-04": {
+        "image_count": 5,
+        "localization_only": {
+          "micro_overall": {
+            "f1": 0.9090909090909091,
+            "fn": 1,
+            "fp": 0,
+            "precision": 1.0,
+            "recall": 0.8333333333333334,
+            "tp": 5
+          },
+          "per_category": {
+            "address": {
+              "f1": null,
+              "fn": 0,
+              "fp": 0,
+              "precision": null,
+              "recall": null,
+              "tp": 0
+            },
+            "email": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 2
+            },
+            "person_name": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            },
+            "phone": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 2
+            }
+          }
+        },
+        "status_counts": {
+          "error": 0,
+          "ok": 5,
+          "partial": 0
+        },
+        "strict": {
+          "macro_f1": 0.5555555555555555,
+          "micro_overall": {
+            "f1": 0.5454545454545454,
+            "fn": 3,
+            "fp": 2,
+            "precision": 0.6,
+            "recall": 0.5,
+            "tp": 3
+          },
+          "per_category": {
+            "address": {
+              "f1": null,
+              "fn": 0,
+              "fp": 0,
+              "precision": null,
+              "recall": null,
+              "tp": 0
+            },
+            "email": {
+              "f1": 0.0,
+              "fn": 2,
+              "fp": 2,
+              "precision": 0.0,
+              "recall": 0.0,
+              "tp": 0
+            },
+            "person_name": {
+              "f1": 0.6666666666666666,
+              "fn": 1,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 0.5,
+              "tp": 1
+            },
+            "phone": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 2
+            }
+          }
+        }
+      },
+      "development-layout-05": {
+        "image_count": 4,
+        "localization_only": {
+          "micro_overall": {
+            "f1": 1.0,
+            "fn": 0,
+            "fp": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "tp": 3
+          },
+          "per_category": {
+            "address": {
+              "f1": null,
+              "fn": 0,
+              "fp": 0,
+              "precision": null,
+              "recall": null,
+              "tp": 0
+            },
+            "email": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 1
+            },
+            "person_name": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 1
+            },
+            "phone": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 1
+            }
+          }
+        },
+        "status_counts": {
+          "error": 0,
+          "ok": 4,
+          "partial": 0
+        },
+        "strict": {
+          "macro_f1": 1.0,
+          "micro_overall": {
+            "f1": 1.0,
+            "fn": 0,
+            "fp": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "tp": 3
+          },
+          "per_category": {
+            "address": {
+              "f1": null,
+              "fn": 0,
+              "fp": 0,
+              "precision": null,
+              "recall": null,
+              "tp": 0
+            },
+            "email": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 1
+            },
+            "person_name": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 1
+            },
+            "phone": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 1
+            }
+          }
+        }
+      },
+      "development-layout-06": {
+        "image_count": 4,
+        "localization_only": {
+          "micro_overall": {
+            "f1": 0.8,
+            "fn": 1,
+            "fp": 0,
+            "precision": 1.0,
+            "recall": 0.6666666666666666,
+            "tp": 2
+          },
+          "per_category": {
+            "address": {
+              "f1": null,
+              "fn": 0,
+              "fp": 0,
+              "precision": null,
+              "recall": null,
+              "tp": 0
+            },
+            "email": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 1
+            },
+            "person_name": {
+              "f1": 0.0,
+              "fn": 1,
+              "fp": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "tp": 0
+            },
+            "phone": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 1
+            }
+          }
+        },
+        "status_counts": {
+          "error": 0,
+          "ok": 4,
+          "partial": 0
+        },
+        "strict": {
+          "macro_f1": 0.6666666666666666,
+          "micro_overall": {
+            "f1": 0.8,
+            "fn": 1,
+            "fp": 0,
+            "precision": 1.0,
+            "recall": 0.6666666666666666,
+            "tp": 2
+          },
+          "per_category": {
+            "address": {
+              "f1": null,
+              "fn": 0,
+              "fp": 0,
+              "precision": null,
+              "recall": null,
+              "tp": 0
+            },
+            "email": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 1
+            },
+            "person_name": {
+              "f1": 0.0,
+              "fn": 1,
+              "fp": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "tp": 0
+            },
+            "phone": {
+              "f1": 1.0,
+              "fn": 0,
+              "fp": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "tp": 1
+            }
+          }
+        }
+      }
+    },
+    "email_mismatch_categories": {
+      "case_or_outer_whitespace_only": 0,
+      "character_difference": 0,
+      "exact_match": 0,
+      "internal_whitespace_difference": 0,
+      "missing_at_symbol": 0,
+      "missing_dot": 0,
+      "multiple_character_edits": 3,
+      "other_difference": 1,
+      "punctuation_difference": 0,
+      "truncation_like": 0
+    },
+    "error_rate": 0.0,
+    "image_count": 28,
+    "localization_only": {
+      "micro_overall": {
+        "f1": 0.846153846153846,
+        "fn": 8,
+        "fp": 0,
+        "precision": 1.0,
+        "recall": 0.7333333333333333,
+        "tp": 22
+      },
+      "per_category": {
+        "address": {
+          "f1": null,
+          "fn": 0,
+          "fp": 0,
+          "precision": null,
+          "recall": null,
+          "tp": 0
+        },
+        "email": {
+          "f1": 0.888888888888889,
+          "fn": 2,
+          "fp": 0,
+          "precision": 1.0,
+          "recall": 0.8,
+          "tp": 8
+        },
+        "person_name": {
+          "f1": 0.6666666666666666,
+          "fn": 5,
+          "fp": 0,
+          "precision": 1.0,
+          "recall": 0.5,
+          "tp": 5
+        },
+        "phone": {
+          "f1": 0.9473684210526316,
+          "fn": 1,
+          "fp": 0,
+          "precision": 1.0,
+          "recall": 0.9,
+          "tp": 9
+        }
+      }
+    },
+    "localized_match_count": 22,
+    "negative_image_count": 6,
+    "negative_image_false_positive_rate": 0.0,
+    "negative_images_with_findings": 0,
+    "partial_rate": 0.0,
+    "per_image": [
+      {
+        "elapsed_ms": 5171.03,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 0,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-001",
+        "image_size": {
+          "height": 768,
+          "width": 1024
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 1,
+        "strict_fp": 0,
+        "strict_tp": 0
+      },
+      {
+        "elapsed_ms": 26665.74,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 1,
+          "phone": 0
+        },
+        "image_id": "dev-002",
+        "image_size": {
+          "height": 2304,
+          "width": 1600
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 33538.396,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 1,
+          "phone": 0
+        },
+        "image_id": "dev-003",
+        "image_size": {
+          "height": 1600,
+          "width": 3072
+        },
+        "segment_count": 2,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 17334.294,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 1,
+          "phone": 0
+        },
+        "image_id": "dev-004",
+        "image_size": {
+          "height": 1280,
+          "width": 2048
+        },
+        "segment_count": 2,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 10045.769,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 1,
+          "phone": 0
+        },
+        "image_id": "dev-005",
+        "image_size": {
+          "height": 1000,
+          "width": 1600
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 7390.356,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 0,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-006",
+        "image_size": {
+          "height": 960,
+          "width": 1280
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 1,
+        "strict_fp": 0,
+        "strict_tp": 0
+      },
+      {
+        "elapsed_ms": 5024.425,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 1,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-007",
+        "image_size": {
+          "height": 768,
+          "width": 1024
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 24051.528,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 0,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-008",
+        "image_size": {
+          "height": 2304,
+          "width": 1600
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 1,
+        "strict_fp": 0,
+        "strict_tp": 0
+      },
+      {
+        "elapsed_ms": 31947.37,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 1,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 1,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-009",
+        "image_size": {
+          "height": 1600,
+          "width": 3072
+        },
+        "segment_count": 2,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 1,
+        "strict_fp": 1,
+        "strict_tp": 0
+      },
+      {
+        "elapsed_ms": 17570.229,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 1,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 1,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-010",
+        "image_size": {
+          "height": 1280,
+          "width": 2048
+        },
+        "segment_count": 2,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 1,
+        "strict_fp": 1,
+        "strict_tp": 0
+      },
+      {
+        "elapsed_ms": 10211.424,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 1,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-011",
+        "image_size": {
+          "height": 1000,
+          "width": 1600
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 7562.969,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 1,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-012",
+        "image_size": {
+          "height": 960,
+          "width": 1280
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 4862.063,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 1
+        },
+        "image_id": "dev-013",
+        "image_size": {
+          "height": 768,
+          "width": 1024
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 24379.156,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 1
+        },
+        "image_id": "dev-014",
+        "image_size": {
+          "height": 2304,
+          "width": 1600
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 31655.633,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 0,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-015",
+        "image_size": {
+          "height": 1600,
+          "width": 3072
+        },
+        "segment_count": 2,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 1,
+        "strict_fp": 0,
+        "strict_tp": 0
+      },
+      {
+        "elapsed_ms": 17675.214,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 1
+        },
+        "image_id": "dev-016",
+        "image_size": {
+          "height": 1280,
+          "width": 2048
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 9962.743,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 1
+        },
+        "image_id": "dev-017",
+        "image_size": {
+          "height": 1000,
+          "width": 1600
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 7795.565,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 1,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 1
+        },
+        "image_id": "dev-018",
+        "image_size": {
+          "height": 960,
+          "width": 1280
+        },
+        "segment_count": 1,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 5478.978,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 2,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 1,
+          "phone": 1
+        },
+        "image_id": "dev-019",
+        "image_size": {
+          "height": 768,
+          "width": 1024
+        },
+        "segment_count": 3,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 1,
+        "strict_fp": 0,
+        "strict_tp": 2
+      },
+      {
+        "elapsed_ms": 24279.691,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 2,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 1,
+          "person_name": 0,
+          "phone": 1
+        },
+        "image_id": "dev-020",
+        "image_size": {
+          "height": 2304,
+          "width": 1600
+        },
+        "segment_count": 3,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 1,
+        "strict_fp": 0,
+        "strict_tp": 2
+      },
+      {
+        "elapsed_ms": 32223.453,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 1,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 2,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 1,
+          "person_name": 0,
+          "phone": 1
+        },
+        "image_id": "dev-021",
+        "image_size": {
+          "height": 1600,
+          "width": 3072
+        },
+        "segment_count": 6,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 2,
+        "strict_fp": 1,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 17822.665,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 1,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 2,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 1,
+          "person_name": 0,
+          "phone": 1
+        },
+        "image_id": "dev-022",
+        "image_size": {
+          "height": 1280,
+          "width": 2048
+        },
+        "segment_count": 5,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 2,
+        "strict_fp": 1,
+        "strict_tp": 1
+      },
+      {
+        "elapsed_ms": 11127.005,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 0,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-023",
+        "image_size": {
+          "height": 1000,
+          "width": 1600
+        },
+        "segment_count": 3,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 0
+      },
+      {
+        "elapsed_ms": 8094.881,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 0,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-024",
+        "image_size": {
+          "height": 960,
+          "width": 1280
+        },
+        "segment_count": 3,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 0
+      },
+      {
+        "elapsed_ms": 5068.752,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 0,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-025",
+        "image_size": {
+          "height": 768,
+          "width": 1024
+        },
+        "segment_count": 3,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 0
+      },
+      {
+        "elapsed_ms": 24347.926,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 0,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-026",
+        "image_size": {
+          "height": 2304,
+          "width": 1600
+        },
+        "segment_count": 3,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 0
+      },
+      {
+        "elapsed_ms": 32662.542,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 0,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-027",
+        "image_size": {
+          "height": 1600,
+          "width": 3072
+        },
+        "segment_count": 3,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 0
+      },
+      {
+        "elapsed_ms": 22483.874,
+        "email_mismatch_categories": {
+          "case_or_outer_whitespace_only": 0,
+          "character_difference": 0,
+          "exact_match": 0,
+          "internal_whitespace_difference": 0,
+          "missing_at_symbol": 0,
+          "missing_dot": 0,
+          "multiple_character_edits": 0,
+          "other_difference": 0,
+          "punctuation_difference": 0,
+          "truncation_like": 0
+        },
+        "errors": [],
+        "finding_count": 0,
+        "finding_counts_by_category": {
+          "address": 0,
+          "email": 0,
+          "person_name": 0,
+          "phone": 0
+        },
+        "image_id": "dev-028",
+        "image_size": {
+          "height": 1280,
+          "width": 2048
+        },
+        "segment_count": 3,
+        "split": "development",
+        "status": "ok",
+        "strict_fn": 0,
+        "strict_fp": 0,
+        "strict_tp": 0
+      }
+    ],
+    "status_counts": {
+      "error": 0,
+      "ok": 28,
+      "partial": 0
+    },
+    "strict": {
+      "macro_f1": 0.6861598440545809,
+      "micro_overall": {
+        "f1": 0.6923076923076923,
+        "fn": 12,
+        "fp": 4,
+        "precision": 0.8181818181818182,
+        "recall": 0.6,
+        "tp": 18
+      },
+      "per_category": {
+        "address": {
+          "f1": null,
+          "fn": 0,
+          "fp": 0,
+          "precision": null,
+          "recall": null,
+          "tp": 0
+        },
+        "email": {
+          "f1": 0.4444444444444445,
+          "fn": 6,
+          "fp": 4,
+          "precision": 0.5,
+          "recall": 0.4,
+          "tp": 4
+        },
+        "person_name": {
+          "f1": 0.6666666666666666,
+          "fn": 5,
+          "fp": 0,
+          "precision": 1.0,
+          "recall": 0.5,
+          "tp": 5
+        },
+        "phone": {
+          "f1": 0.9473684210526316,
+          "fn": 1,
+          "fp": 0,
+          "precision": 1.0,
+          "recall": 0.9,
+          "tp": 9
+        }
+      }
+    },
+    "transcription_mismatch_count": 4,
+    "value_exactness_on_localized_matches": 0.8181818181818182
+  },
+  "phone_mode": "strict",
+  "recorded_at_utc": "2026-10-22T17:39:10.847576+00:00",
+  "run_status": "completed",
+  "serializer_contract_check": "passed",
+  "split": "development",
+  "tile_configuration": {
+    "canvas_size": null,
+    "tile_overlap": 128,
+    "tile_size": 1600
+  },
+  "versions": {
+    "easyocr": "1.7.2",
+    "numpy": "2.5.3",
+    "opencv_python": "5.0.0.93",
+    "pillow": "12.3.0",
+    "python": "3.14.4",
+    "spacy": "3.8.16",
+    "spacy_model": {
+      "name": "core_web_sm",
+      "version": "3.8.0"
+    },
+    "torch": "2.14.0",
+    "torchvision": "0.29.0"
+  }
+}

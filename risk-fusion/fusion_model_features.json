@@ -1,0 +1,9 @@
+[
+  "ocr_pii_flag",
+  "num_pii_types",
+  "has_address",
+  "has_phone",
+  "landmark_flag",
+  "landmark_confidence",
+  "scene_score"
+]

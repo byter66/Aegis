@@ -121,6 +121,59 @@ def test_combines_all_finding_types_with_segment_provenance() -> None:
     ]
 
 
+def test_repeated_email_occurrences_keep_each_source_region() -> None:
+    first = _positioned_segment(
+        "alex@example.invalid and alex@example.invalid",
+        left=10,
+        top=10,
+        right=300,
+        bottom=35,
+    )
+    second = _positioned_segment(
+        "alex@example.invalid",
+        left=40,
+        top=100,
+        right=200,
+        bottom=125,
+    )
+
+    result = analyze_image(
+        "synthetic.png",
+        ocr=FakeOCR(_result(first, second)),
+        ner=FakeNER(),
+    )
+    emails = [item for item in result.findings if item.category is FindingCategory.EMAIL]
+
+    assert result.status is PipelineStatus.OK
+    assert len(emails) == 3
+    assert [item.source_segment_index for item in emails] == [0, 0, 1]
+    assert [item.image_region for item in emails] == [
+        first.image_region,
+        first.image_region,
+        second.image_region,
+    ]
+
+
+def test_multiline_address_components_keep_each_line_region() -> None:
+    lines = (
+        _positioned_segment("Address: 42 Main Street", left=10, top=10, right=250, bottom=35),
+        _positioned_segment("City: Exampleton", left=10, top=40, right=180, bottom=65),
+        _positioned_segment("ZIP code: 12345", left=10, top=70, right=160, bottom=95),
+    )
+
+    result = analyze_image(
+        "synthetic.png",
+        ocr=FakeOCR(_result(*lines)),
+        ner=FakeNER(),
+    )
+    addresses = [item for item in result.findings if item.category is FindingCategory.ADDRESS]
+
+    assert result.status is PipelineStatus.OK
+    assert len(addresses) == 3
+    assert [item.source_segment_index for item in addresses] == [0, 1, 2]
+    assert [item.image_region for item in addresses] == [line.image_region for line in lines]
+
+
 def test_address_detector_runs_per_segment_and_preserves_policy_and_provenance() -> None:
     first_text = "Deliver to 42 Main Street"
     second_text = "Mail to 7 Oak Avenue"

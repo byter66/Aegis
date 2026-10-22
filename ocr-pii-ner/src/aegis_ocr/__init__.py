@@ -5,6 +5,7 @@ from .ocr import EasyOCREngine, OCRResult, OCRSegment
 from .ner import SpacyNERAdapter
 from .pipeline import analyze_image
 from .risk_fusion import to_risk_fusion_ocr_payload
+from .redaction import RedactionError, redact_image
 from .schema import (
     Finding,
     FindingCategory,
@@ -33,4 +34,6 @@ __all__ = [
     "ValuePolicy",
     "detect_emails",
     "detect_phones",
+    "RedactionError",
+    "redact_image",
 ]

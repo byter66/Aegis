@@ -88,6 +88,8 @@ Errors use structured codes, stages, and generic messages; raw OCR text, detecte
 
 The supported categories are `email`, `phone`, address candidates (`address`), and provisional `person_name`. The schema carries a detector name, optional raw and redacted values, a text span, optional image region, optional `ocr_confidence`, and optional `detector_score` with required semantics when supplied. Regex matches do not receive invented confidence scores. `PipelineResult` contains a schema version, status, findings, and structured errors; it rejects duplicate findings with the same category, span, and source-segment index.
 
+`redact_image(image, result)` returns an opaque-black RGB copy with every finding's full OCR region covered. It fails closed for incomplete analysis or a finding without a usable region. The region is the whole OCR segment (or the union for grouped phones), so this may cover nearby non-sensitive text. A successful return is only the rendered redacted image; an empty finding list does not prove that OCR missed no PII. Consumers must use this exact returned image for both preview and export. This module does not include the Aegis Review/posting UI, so end-to-end preview/export wiring must be verified by that application.
+
 The schema and detectors use typed dataclasses and standard-library validation. The package supports Python 3.10 and later; the repository environment has Python 3.14.4. `EasyOCREngine` uses EasyOCR's English reader in CPU mode, initializes it lazily, and reuses it. It is not thread-safe in this MVP; use one engine per worker or synchronize access externally.
 
 ## Detector limitations

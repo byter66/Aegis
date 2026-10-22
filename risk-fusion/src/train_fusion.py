@@ -1,4 +1,6 @@
 """Train and evaluate the AEGIS Learned Risk Fusion Classifier."""
+import os
+import json
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
@@ -8,10 +10,16 @@ import joblib
 
 
 def train_risk_models():
-    # 1. Load the dataset you just created
-    df = pd.read_csv("risk-fusion/risk_dataset.csv")
+    # 1. Load the dataset
+    dataset_path = "risk-fusion/risk_dataset.csv"
+    if not os.path.exists(dataset_path):
+        # Fallback to local path if executed from risk-fusion directory
+        dataset_path = "risk_dataset.csv"
+    df = pd.read_csv(dataset_path)
 
     # 2. Separate features (X) from the target label (y)
+    # CHANGE 3: If risk_dataset.csv has a "scene_score" column, include it as a 7th feature;
+    # otherwise train on the current 6.
     feature_columns = [
         "ocr_pii_flag",
         "num_pii_types",
@@ -20,6 +28,12 @@ def train_risk_models():
         "landmark_flag",
         "landmark_confidence"
     ]
+    if "scene_score" in df.columns:
+        feature_columns.append("scene_score")
+        print("Detected 'scene_score' in dataset; training with 7 features.")
+    else:
+        print("Training with standard 6 features.")
+
     X = df[feature_columns]
     y = df["risk_label"]
 
@@ -65,9 +79,19 @@ def train_risk_models():
     print("\nClassification Report (Precision, Recall, F1-Score):")
     print(classification_report(y_test, mlp_preds, target_names=target_names))
 
-    # 4. Save the trained Logistic Regression model to disk for production use
-    joblib.dump(lr_model, "risk-fusion/fusion_model.joblib")
-    print("\nSaved trained model to: risk-fusion/fusion_model.joblib")
+    # 4. Save the trained Logistic Regression model and feature names list to disk
+    model_output_path = "risk-fusion/fusion_model.joblib"
+    if not os.path.exists("risk-fusion") and os.path.exists("src"):
+        model_output_path = "fusion_model.joblib"
+
+    # Save model and a sidecar JSON features list next to fusion_model.joblib
+    joblib.dump(lr_model, model_output_path)
+    features_json_path = os.path.splitext(model_output_path)[0] + "_features.json"
+    with open(features_json_path, "w", encoding="utf-8") as f:
+        json.dump(feature_columns, f, indent=2)
+
+    print(f"\nSaved trained model to: {model_output_path}")
+    print(f"Saved feature list to: {features_json_path}")
 
 
 if __name__ == "__main__":
