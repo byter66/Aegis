@@ -14,8 +14,9 @@ places = [
     "Taj Mahal", "Red Fort", "India Gate", "Gateway of India", "Hawa Mahal",
     "Charminar", "Qutb Minar", "Victoria Memorial", "Mysore Palace",
     "Chinese fishing nets in Fort Kochi", "Fort Kochi", "Vagamon",
-    "IIIT Kottayam", "Pala", "Saudi Arabia", "Melbourne", "Qatar",
-    "Kochi International Airport", "Kottayam Railway Station"
+    "IIIT Kottayam", "Pala","Burj Khalifa", "Burj Al Arab", "Eiffel Tower", "Big Ben", "Tower Bridge",
+    "Statue of Liberty", "Sydney Opera House", "Colosseum", "Golden Gate Bridge",
+    "Petronas Towers", "Kochi International Airport", "Kottayam Railway Station"
 ]
 
 negatives = [
